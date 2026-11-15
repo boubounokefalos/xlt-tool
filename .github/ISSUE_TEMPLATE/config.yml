@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: XLT (the launcher on the PSP)
+    url: https://github.com/boubounokefalos/xlt/issues/new/choose
+    about: Problems in XLT itself, on the PSP, go to XLT's issues.

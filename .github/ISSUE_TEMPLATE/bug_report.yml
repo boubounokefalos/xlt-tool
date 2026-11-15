@@ -1,0 +1,89 @@
+name: Bug report
+description: Something in XLT Tool doesn't work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! Please check the [open issues](https://github.com/boubounokefalos/xlt-tool/issues) first, in case it's already known.
+        A problem in XLT itself (on the PSP) goes to [XLT's issues](https://github.com/boubounokefalos/xlt/issues/new/choose).
+  - type: input
+    id: version
+    attributes:
+      label: XLT Tool version
+      description: ⋮ → About XLT Tool shows it.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Linux distro and desktop
+      description: And X11 or Wayland, if you know.
+      placeholder: "Fedora 41, GNOME 47, Wayland"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where it happens
+      options:
+        - Starting XLT Tool, the window or the theme
+        - Library (games on the PC)
+        - Library with the PSP connected (send, copy, remove, saves, play time)
+        - Converting video
+        - Converting music or editing tags
+        - Converting pictures, books, subtitles or ZIP
+        - PS1 games to EBOOT
+        - ISO / CSO
+        - Sending over USB sync
+        - Memory Stick or folder destinations
+        - Box art
+        - Updates
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw (the exact error message helps), and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen
+      description: As exactly as you can. Does it happen every time?
+      placeholder: |
+        1. Add an .mkv to the Convert tab
+        2. Choose Save to: PSP over USB (XLT)
+        3. Press Convert
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: The file involved (if any)
+      description: |
+        For a conversion: what the source is. The row in the queue shows its size, frame rate and duration; for a video, `ffprobe -hide_banner FILE` gives the details. For a PS1 game: how many discs, and whether it has CD music.
+        Please don't attach copyrighted games, music or films.
+  - type: textarea
+    id: psp
+    attributes:
+      label: The PSP (if it's involved)
+      description: Model, XLT version (Settings → About on the PSP) and how it's connected (USB sync, USB mode, Memory Stick in a card reader).
+      placeholder: "PSP-3000, XLT 1.1.0, USB sync"
+  - type: textarea
+    id: output
+    attributes:
+      label: Terminal output
+      description: |
+        Start XLT Tool from a terminal (`./XLT_Tool-1.0.0-x86_64.AppImage`), make the problem happen, and paste what it printed. `XLTTOOL_DEBUG=1` before the command adds more.
+        For USB sync problems, XLT's `PSP/GAME/XLT/xltsync.log` (on the Memory Stick) helps too.
+      render: text
+  - type: textarea
+    id: shots
+    attributes:
+      label: Screenshots
+      description: Drag them here.
