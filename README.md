@@ -1,0 +1,124 @@
+# XLT Tool
+
+[![Vibe-coded with Claude](https://img.shields.io/badge/vibe--coded-with%20Claude-d97757)](#how-it-was-made)
+![Platform: Linux](https://img.shields.io/badge/platform-Linux%20(AppImage)-1f6feb)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+
+The PC companion of [XLT](https://github.com/boubounokefalos/xlt), the PSP launcher. XLT Tool keeps your PSP games
+in one library, shows what is on the PSP beside what is on your PC, and turns videos, music, pictures, books and
+PS1 games into files the PSP plays, sending them straight to a PSP running XLT over USB, with no USB mode, while
+XLT keeps running.
+
+![XLT Tool in motion](docs/media/xlt_tool_teaser.gif)
+
+**The walk-through** ([`docs/media/xlt_tool_demo.mp4`](docs/media/xlt_tool_demo.mp4), no sound)
+
+> Everything in the screenshots and videos is made up: the games, their art, the songs and the PSP are invented
+> and drawn by `tools/make_demo_media.py` from XLT Tool's real window, so none of it belongs to anyone.
+
+## What it does
+
+- **Game library.** Your PSP games on the PC (ISO, CSO, ZSO, homebrew, PSN and PS1 EBOOTs) with their icons,
+  backgrounds and details, read from the games themselves. Search, filter and sort; save backups kept per game.
+- **What's on the PSP.** With XLT connected, the PSP's games appear beside the PC's: **PC + PSP**, **PSP only**
+  or **PC only**, its free space and battery, and how long you've played each game and when.
+- **Send, copy and remove games, with their saves.** Send a game to the PSP, copy one from it, or remove it.
+  Saves are always backed up to the PC first, and put back without ever leaving half of one.
+- **Convert for the PSP.** Any video to MP4 the PSP plays (with subtitles and an XMB thumbnail), music to MP3,
+  M4A or FLAC with tags, covers and lyrics, pictures to JPEG or PNG, books to text, subtitles to SRT, folders to
+  ZIP.
+- **PS1 games to EBOOT.** A `.cue` becomes an EBOOT.PBP the PSP runs, with its icon, CD music and up to five
+  discs in one. ISO games can be shrunk to CSO.
+- **Straight to the PSP.** Over XLT's USB sync, each file goes where XLT looks for it while the next one
+  converts; or to a Memory Stick, or any folder.
+- **Box art** for PSP and PS1 games from the libretro project, only if you turn it on.
+- **Fits your desktop.** Follows light and dark mode, the accent colour and the font (GNOME, KDE Plasma and
+  others), uses your file dialogs, and updates itself.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Library](docs/media/shot_1_library.png) | ![PSP only](docs/media/shot_2_psp_only_menu.png) |
+| The Library with the PSP connected: badges, details, play time, saves | A game only on the PSP, right-clicked |
+| ![Convert video](docs/media/shot_3_convert_video.png) | ![Convert music](docs/media/shot_4_convert_music.png) |
+| The Convert queue, sending to the PSP over USB | Music settings |
+| ![Song editor](docs/media/shot_5_tag_editor.png) | ![Other](docs/media/shot_6_convert_other.png) |
+| Editing a song's tags, cover and lyrics | Books, subtitles, ZIP, PS1 and PSP games |
+
+![Light theme](docs/media/shot_7_light_theme.png)
+
+## Getting started
+
+1. Download `XLT_Tool-<version>-x86_64.AppImage` from the [releases](https://github.com/boubounokefalos/xlt-tool/releases),
+   make it executable (`chmod +x`, or in its Properties), and start it. **⋮ → Add to applications menu** adds it
+   to your desktop's menu.
+2. For the Library, choose **Folders** and add the folders where you keep your games.
+3. To send to the PSP over USB: in XLT, turn on **Settings → XLT → USB sync** and plug the cable in. The PSP shows
+   up under **Save to**. The first time, pick **PSP over USB: allow access…** there and give your password once.
+   (A Memory Stick in a card reader, or the PSP in USB mode, shows up there too.)
+4. Drop files on the **Convert** tab, check each kind's settings, and press **Convert**.
+
+It runs on x86-64 Linux distros with glibc 2.34 or later (Ubuntu 22.04+, Debian 12+, Fedora 35+, Arch, openSUSE
+Tumbleweed…), on X11 or Wayland. It needs nothing else installed: Python, Qt, ffmpeg and the ATRAC3 encoder are
+inside. Making PS1 EBOOTs needs one PS1 EBOOT of your own, once (XLT Tool copies Sony's small start-up parts
+from it, as it can't include them). A Windows version is planned.
+
+## USB sync or USB mode?
+
+XLT Tool sends to the PSP over XLT's **USB sync**. The PSP's own USB mode works too (the stick shows up under **Save to** like any Memory Stick), but USB sync does more:
+
+| | **USB sync** (XLT Tool) | **USB mode** (the PSP as a USB drive) |
+|---|---|---|
+| While connected | XLT keeps running: play music, browse, even start a game | The PSP shows "USB connected" and nothing else works |
+| New files in XLT | Appear by themselves a moment after the last one | Only after you leave USB mode and XLT looks again |
+| A cable pulled mid-copy | Nothing half-written is left: a file only appears once it is whole and its checksum matches | A broken file stays on the stick |
+| File names | Always ones the PSP can show (Japanese, accents and all) | The PC writes them its way; a name the PSP can't hold makes the file unreachable |
+| What the PC can change | Only XLT's folders and save data, never system files or plugins | The whole Memory Stick |
+| Games and saves | XLT Tool shows what's on the PSP, sends and removes games, backs up and restores saves, shows the battery | Copy files by hand |
+| Speed (64 MB) | 8.3 MB/s | 9.6 MB/s |
+| On the PC | XLT Tool (Linux for now; allow access once) | Any file manager, no software |
+
+USB sync suits everyday use: sending a few videos or songs, or adding a game, without leaving XLT. USB mode is
+still in XLT's control center for anything else, such as copying a whole folder tree or reaching files outside
+XLT's folders.
+
+How it works: [Sending to the PSP over USB](docs/USB-Sync.md), and XLT's [USB sync, in depth](https://github.com/boubounokefalos/xlt/blob/main/docs/USB-Sync.md).
+
+## How it was made
+
+XLT Tool is **vibe-coded**, like XLT: written with **Claude** (Anthropic's AI model) in
+[Claude Code](https://claude.com/claude-code). The author described what it should do, chose between the options
+Claude proposed, and tried every step in the real app and on a real PSP (a PSP-E1004 with ARK-5); Claude wrote the
+code, the tests and these docs. Like any homebrew tool, it comes with no warranty.
+
+## For developers
+
+XLT Tool is Python 3 with PySide6 (Qt 6); ffmpeg and atracdenc do the heavy conversions. Run it from source with
+`./run-dev.sh`, build the AppImage with `./packaging/build-appimage.sh`, run the tests with
+`python3 -I -m unittest discover -s tests`. How each part works, the formats it writes and how it is tested are in
+the **[developer docs](docs/Home.md)**.
+
+## Credits
+
+XLT Tool is free software under the **GPL-3.0** (see [LICENSE](LICENSE)). It shares code with
+[XLT](https://github.com/boubounokefalos/xlt) (the USB sync client, the logo and boot screen), and the AppImage
+bundles, each under its own licence:
+[Python](https://www.python.org/) (via [python-build-standalone](https://github.com/astral-sh/python-build-standalone)),
+[Qt 6 and PySide6](https://doc.qt.io/qtforpython/) (LGPL-3.0),
+[FFmpeg](https://ffmpeg.org/) ([BtbN's GPL build](https://github.com/BtbN/FFmpeg-Builds)),
+[atracdenc](https://github.com/dcherednik/atracdenc) (LGPL-2.1),
+[mutagen](https://github.com/quodlibet/mutagen) (GPL-2.0+),
+[pyusb](https://github.com/pyusb/pyusb) and [libusb](https://libusb.info/),
+[jeepney](https://gitlab.com/takluyver/jeepney) (MIT).
+The PS1 EBOOT layout follows what [pop-fe](https://github.com/sahlberg/pop-fe) writes; box art comes from
+[libretro-database](https://github.com/libretro/libretro-database) and
+[libretro-thumbnails](https://github.com/libretro-thumbnails). The full list, with what each is used for:
+**[License and credits](docs/Credits.md)**.
+
+## Trademarks
+
+PlayStation, PSP, PlayStation Portable, UMD, XMB and POPS are trademarks of Sony Interactive Entertainment Inc.;
+Memory Stick and ATRAC3 are trademarks of Sony Group Corporation. Claude and Claude Code are trademarks of
+Anthropic. XLT Tool is an independent, unofficial project, not affiliated with or endorsed by Sony or the ARK
+developers, and contains no Sony software.
