@@ -27,6 +27,7 @@ The protocol is plugin/xltsync/xltsync.h: keep the two in step.
 from __future__ import annotations
 
 import argparse
+import errno
 import os
 import random
 import struct
@@ -214,6 +215,10 @@ class Link:
             if cfg is None or cfg.bConfigurationValue != 1:
                 dev.set_configuration()
         except usb.core.USBError as e:
+            if sys.platform == "win32" and e.errno in (errno.EACCES, errno.ENOSYS):
+                # libusb can't open a device whose driver isn't WinUSB ("not supported").
+                raise LinkError("Permission denied: Windows has not given the PSP the WinUSB driver. "
+                                "Unplug the PSP and plug it in again, or set the driver up from XLT Tool")
             if e.errno == 13:
                 raise LinkError("Permission denied: install tools/60-xltsync.rules (see the file), "
                                 "then unplug and replug the PSP")

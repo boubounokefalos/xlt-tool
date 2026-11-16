@@ -31,6 +31,19 @@ Each keeps its own licence. Inside the AppImage, XLT Tool's licence, this page a
 | [jeepney](https://gitlab.com/takluyver/jeepney) | D-Bus, for the desktop portal | MIT |
 | The [AppImage](https://appimage.org/) runtime, from appimagetool | Starts the AppImage | MIT |
 
+## Bundled in the Windows build
+
+The same Python packages (PySide6, mutagen, pyusb, libusb), with these instead of the AppImage's own parts. The
+licences of ffmpeg and atracdenc, XLT Tool's licence and this page are in the `licenses` folder.
+
+| Part | What for | License |
+|---|---|---|
+| [Python](https://www.python.org/) 3.13 (python.org's Windows build) | Runs XLT Tool | PSF License |
+| [PyInstaller](https://pyinstaller.org/) | Packs Python and the app into `XLT Tool.exe` and its folder | GPL-2.0 with the bootloader exception (programs it packs may use any licence) |
+| [FFmpeg](https://ffmpeg.org/) 8.1, [BtbN's](https://github.com/BtbN/FFmpeg-Builds) Windows GPL build (shared) | Conversions, probing | GPL-3.0 (this build) |
+| [atracdenc](https://github.com/dcherednik/atracdenc) 0.2.3, its own Windows build | ATRAC3 for PS1 CD music | LGPL-2.1 |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) by Jordan Russell and Martijn Laan | Makes the installer | Inno Setup License (free, also for commercial use) |
+
 ## Formats and references (no code taken)
 
 - **[pop-fe](https://github.com/sahlberg/pop-fe)** by Ronnie Sahlberg: the layout of PS1 EBOOTs with CD music (the TOC as POPS reads it, the audio

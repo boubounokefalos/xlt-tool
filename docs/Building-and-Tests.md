@@ -33,11 +33,37 @@ Output: `dist/XLT_Tool-<version>-x86_64.AppImage`. It runs on distros with glibc
 Debian 12+, Fedora 35+, RHEL 9+, Arch, openSUSE Tumbleweed…), on X11 or Wayland. The licences of the bundled
 parts are in `usr/share/xlt-tool/` inside it.
 
-## Windows (on hold)
+## Windows
 
-`packaging/build-windows.sh` builds a portable ZIP on Linux (Windows Python and PySide6 wheels, BtbN's Windows
-ffmpeg, atracdenc's own Windows build, a launcher cross-compiled with mingw-w64). It is not released: Windows 11's
-Smart App Control blocks unsigned programs, so it needs code signing first.
+From source on Windows: `.\run-dev.ps1 [files…]` makes `.venv` on its first run (PySide6, mutagen, pyusb,
+libusb-package) and starts the app; ffmpeg and ffprobe go on `PATH` or beside the program. The tests run the
+same way: `.venv\Scripts\python -I -m unittest discover -s tests`. USB sync needs nothing installed: XLT's sync
+device asks Windows for the WinUSB driver itself.
+
+The build, on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build-windows.ps1
+```
+
+It makes the installer, `dist/XLT_Tool-<version>-windows-x64-setup.exe`
+([packaging/xlt-tool.iss](../packaging/xlt-tool.iss), Inno Setup 6: `winget install JRSoftware.InnoSetup`;
+`-NoInstaller` skips it), from a PyInstaller folder build, `XLT Tool.exe` with Python, PySide6-Essentials, mutagen, pyusb and
+libusb-package (the same versions as the AppImage), adds BtbN's Windows ffmpeg 8.1 (GPL, shared) and
+[atracdenc 0.2.3's own Windows build](https://github.com/dcherednik/atracdenc/releases/tag/0.2.3) to its `bin`
+folder and the licences to `licenses`, tries it (libx264 in ffmpeg, atracdenc encoding, libusb, the exe
+starting) and zips it as well: `dist/XLT_Tool-<version>-windows-x64.zip`, the portable one. `-TestInstaller`
+installs the installer silently into `build\windows\install-test`, starts the app from there and uninstalls it.
+Smart App Control, when it is on, blocks the unsigned programs, so the smoke test fails on such a PC: build there
+with GitHub Actions instead. Downloads are cached in `build/cache`;
+atracdenc's is pinned by SHA-256, ffmpeg's rolling build is checked against the digest GitHub gives for it.
+`XLTTOOL_PYTHON` picks the Python it builds with.
+
+Releases are built by GitHub Actions instead ([.github/workflows/windows.yml](../.github/workflows/windows.yml),
+on each `v*` tag, each push to the `windows` branch, or by hand): the same script with `-TestInstaller` on GitHub's
+Windows runner, the installer and the zip kept as the run's artifacts and, on a tag, put on that tag's release. A
+file already on a release is never replaced (people's downloads and winget check its SHA-256): a fix is a new
+version. The build is not signed.
 
 ## Tests
 

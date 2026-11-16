@@ -1,7 +1,7 @@
 # XLT Tool
 
 [![Vibe-coded with Claude](https://img.shields.io/badge/vibe--coded-with%20Claude-d97757)](#how-it-was-made)
-![Platform: Linux](https://img.shields.io/badge/platform-Linux%20(AppImage)-1f6feb)
+![Platform: Linux and Windows](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-1f6feb)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 The PC companion of [XLT](https://github.com/boubounokefalos/xlt), the PSP launcher. XLT Tool keeps your PSP games
@@ -32,8 +32,8 @@ XLT keeps running.
 - **Straight to the PSP.** Over XLT's USB sync, each file goes where XLT looks for it while the next one
   converts; or to a Memory Stick, or any folder.
 - **Box art** for PSP and PS1 games from the libretro project, only if you turn it on.
-- **Fits your desktop.** Follows light and dark mode, the accent colour and the font (GNOME, KDE Plasma and
-  others), uses your file dialogs, and updates itself.
+- **Fits your desktop.** Follows light and dark mode, the accent colour and the font (GNOME, KDE Plasma,
+  Windows and others), uses your file dialogs, and tells you about new versions (the AppImage updates itself).
 
 ## Screenshots
 
@@ -50,7 +50,8 @@ XLT keeps running.
 
 ## Getting started
 
-1. Download `XLT_Tool-<version>-x86_64.AppImage` from the [releases](https://github.com/boubounokefalos/xlt-tool/releases),
+1. Download `XLT_Tool-<version>-x86_64.AppImage` from the [releases](https://github.com/boubounokefalos/xlt-tool/releases)
+   (on Windows, see [below](#on-windows)),
    make it executable (`chmod +x`, or in its Properties), and start it. **⋮ → Add to applications menu** adds it
    to your desktop's menu.
 2. For the Library, choose **Folders** and add the folders where you keep your games.
@@ -62,7 +63,31 @@ XLT keeps running.
 It runs on x86-64 Linux distros with glibc 2.34 or later (Ubuntu 22.04+, Debian 12+, Fedora 35+, Arch, openSUSE
 Tumbleweed…), on X11 or Wayland. It needs nothing else installed: Python, Qt, ffmpeg and the ATRAC3 encoder are
 inside. Making PS1 EBOOTs needs one PS1 EBOOT of your own, once (XLT Tool copies Sony's small start-up parts
-from it, as it can't include them). A Windows version is planned.
+from it, as it can't include them).
+
+### On Windows
+
+> ⚠️ **Smart App Control must be off.** XLT Tool isn't signed, and Windows 11's Smart App Control blocks unsigned
+> programs completely: with it on, the installer and the app won't start at all, and there is no exception for
+> one app. Check it in **Windows Security → App & browser control → Smart App Control**: if it says **On** or
+> **Evaluation**, set it to **Off** before installing. Many PCs have it off already (Windows 10 has none).
+> Turning it off is your choice, and turning it back on afterwards isn't always possible without reinstalling
+> Windows; Microsoft Defender keeps protecting the PC either way.
+
+Download `XLT_Tool-<version>-windows-x64-setup.exe` from the releases page and run it. It installs for you alone
+(no administrator password) and adds XLT Tool to the Start menu; ffmpeg and the ATRAC3 encoder are inside. For
+USB sync nothing else is needed: Windows sets the PSP up by itself the first time. The `.zip` is the same app,
+portable: unzip it anywhere and start `XLT Tool.exe`. It runs on Windows 10 and 11, 64-bit.
+
+XLT Tool isn't signed (a certificate costs money every year; it is a free, community-built tool), so Windows
+treats it as unknown:
+
+- **"Windows protected your PC"** (SmartScreen) shows when you start the downloaded installer: choose
+  **More info**, then **Run anyway**. Once installed, XLT Tool starts without it.
+- **Smart App Control** (Windows 11): blocks it, see above.
+- If an antivirus, Windows Defender included, says XLT Tool is a threat, that's a false positive common to
+  unsigned Python programs. You can send the file to [Microsoft](https://www.microsoft.com/en-us/wdsi/filesubmission)
+  to have it checked; please [open an issue](https://github.com/boubounokefalos/xlt-tool/issues) too.
 
 ## USB sync or USB mode?
 
@@ -77,7 +102,7 @@ XLT Tool sends to the PSP over XLT's **USB sync**. The PSP's own USB mode works 
 | What the PC can change | Only XLT's folders and save data, never system files or plugins | The whole Memory Stick |
 | Games and saves | XLT Tool shows what's on the PSP, sends and removes games, backs up and restores saves, shows the battery | Copy files by hand |
 | Speed (64 MB) | 8.3 MB/s | 9.6 MB/s |
-| On the PC | XLT Tool (Linux for now; allow access once) | Any file manager, no software |
+| On the PC | XLT Tool (Linux: allow access once; Windows: nothing to set up) | Any file manager, no software |
 
 USB sync suits everyday use: sending a few videos or songs, or adding a game, without leaving XLT. USB mode is
 still in XLT's control center for anything else, such as copying a whole folder tree or reaching files outside
@@ -103,14 +128,15 @@ the **[developer docs](docs/Home.md)**.
 
 XLT Tool is free software under the **GPL-3.0** (see [LICENSE](LICENSE)). It shares code with
 [XLT](https://github.com/boubounokefalos/xlt) (the USB sync client, the logo and boot screen), and the AppImage
-bundles, each under its own licence:
+and the Windows build bundle, each under its own licence:
 [Python](https://www.python.org/) (via [python-build-standalone](https://github.com/astral-sh/python-build-standalone)),
 [Qt 6 and PySide6](https://doc.qt.io/qtforpython/) (LGPL-3.0),
 [FFmpeg](https://ffmpeg.org/) ([BtbN's GPL build](https://github.com/BtbN/FFmpeg-Builds)),
 [atracdenc](https://github.com/dcherednik/atracdenc) (LGPL-2.1),
 [mutagen](https://github.com/quodlibet/mutagen) (GPL-2.0+),
 [pyusb](https://github.com/pyusb/pyusb) and [libusb](https://libusb.info/),
-[jeepney](https://gitlab.com/takluyver/jeepney) (MIT).
+[jeepney](https://gitlab.com/takluyver/jeepney) (MIT); the Windows build is packed with
+[PyInstaller](https://pyinstaller.org/) and its installer made with [Inno Setup](https://jrsoftware.org/isinfo.php).
 The PS1 EBOOT layout follows what [pop-fe](https://github.com/sahlberg/pop-fe) writes; box art comes from
 [libretro-database](https://github.com/libretro/libretro-database) and
 [libretro-thumbnails](https://github.com/libretro-thumbnails). The full list, with what each is used for:
@@ -119,6 +145,7 @@ The PS1 EBOOT layout follows what [pop-fe](https://github.com/sahlberg/pop-fe) w
 ## Trademarks
 
 PlayStation, PSP, PlayStation Portable, UMD, XMB and POPS are trademarks of Sony Interactive Entertainment Inc.;
-Memory Stick and ATRAC3 are trademarks of Sony Group Corporation. Claude and Claude Code are trademarks of
+Memory Stick and ATRAC3 are trademarks of Sony Group Corporation. Windows is a trademark of Microsoft. Claude
+and Claude Code are trademarks of
 Anthropic. XLT Tool is an independent, unofficial project, not affiliated with or endorsed by Sony or the ARK
 developers, and contains no Sony software.

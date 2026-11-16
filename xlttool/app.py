@@ -4,8 +4,27 @@ import os
 import sys
 
 
+def _prepare_windows():
+    """Windows, before QApplication exists: XLT Tool's own taskbar entry and icon (not
+    python.exe's), and no console window flashing up for each ffmpeg or ffprobe run."""
+    import ctypes
+    import subprocess
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("XLT.XLTTool")
+    except (AttributeError, OSError):
+        pass
+    popen_init = subprocess.Popen.__init__
+
+    def no_console(self, *args, creationflags=0, **kwargs):
+        popen_init(self, *args, creationflags=creationflags | subprocess.CREATE_NO_WINDOW, **kwargs)
+    subprocess.Popen.__init__ = no_console
+
+
 def _prepare_env():
     """Must run before QApplication exists."""
+    if sys.platform == "win32":
+        _prepare_windows()
+        return
     in_appimage = bool(os.environ.get("APPIMAGE") or os.environ.get("APPDIR"))
     # Settings meant for the system Qt can break the bundled one.
     for var in ("QT_STYLE_OVERRIDE", "QT_PLUGIN_PATH", "QT_QPA_PLATFORMTHEME_OVERRIDE"):
@@ -70,7 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationDisplayName(APP_NAME)
     app.setStyle("Fusion")
     app.setWindowIcon(QIcon(os.path.join(os.path.dirname(__file__), "xlt-tool.svg")))
-    _icon_theme()
+    if sys.platform != "win32":     # Windows has no icon themes: Qt's own fallbacks are used
+        _icon_theme()
     theme.install_menu_polish(app)
 
     def apply_theme():

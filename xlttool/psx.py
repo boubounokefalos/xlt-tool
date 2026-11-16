@@ -147,11 +147,12 @@ def atracdenc() -> str:
     env = os.environ.get("XLTTOOL_ATRACDENC")
     if env and os.access(env, os.X_OK):
         return env
-    from . import media  # the AppImage keeps it beside its ffmpeg (usr/bin)
+    from . import media  # the AppImage and the Windows build keep it beside their ffmpeg
     ff = media.ffmpeg_path()
-    for here in ([os.path.join(os.path.dirname(ff), "atracdenc")] if ff else []) + \
-            [os.path.join(os.path.dirname(sys.executable), "atracdenc")]:
-        if os.access(here, os.X_OK):
+    name = "atracdenc.exe" if sys.platform == "win32" else "atracdenc"
+    for here in ([os.path.join(os.path.dirname(ff), name)] if ff else []) + \
+            [os.path.join(os.path.dirname(sys.executable), name)]:
+        if os.path.isfile(here) and os.access(here, os.X_OK):
             return here
     return shutil.which("atracdenc") or ""
 

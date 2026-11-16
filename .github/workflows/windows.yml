@@ -1,0 +1,81 @@
+# The Windows build: packaging/build-windows.ps1 on GitHub's Windows runner. The installer
+# (XLT_Tool-<version>-windows-x64-setup.exe) is tried there: installed silently, started,
+# uninstalled. It and the portable zip are kept as the run's artifacts and, on a tag, put on
+# that tag's release. Unsigned.
+name: Windows build
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["windows"]   # the Windows port's branch, tried on each push
+  workflow_dispatch:
+
+permissions:
+  contents: write      # the files go on the tag's release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"       # the AppImage's Python
+
+      - name: Downloads cache (ffmpeg, atracdenc)
+        uses: actions/cache@v6
+        with:
+          path: build/cache
+          key: windows-downloads-${{ hashFiles('packaging/build-windows.ps1') }}
+
+      - name: Inno Setup
+        shell: powershell
+        run: |
+          if (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") { Write-Host 'Inno Setup is there'; exit 0 }
+          choco install innosetup --no-progress -y
+          exit $LASTEXITCODE
+
+      - name: Build and try the installer
+        shell: powershell
+        env:
+          XLTTOOL_PYTHON: python
+        run: |
+          .\packaging\build-windows.ps1 -TestInstaller
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $v = (Select-String -Path xlttool\__init__.py -Pattern '^__version__ = "(.*)"').Matches[0].Groups[1].Value
+          "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: XLT_Tool-${{ env.VERSION }}-windows-x64-setup
+          path: dist/XLT_Tool-${{ env.VERSION }}-windows-x64-setup.exe
+          archive: false
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: XLT_Tool-${{ env.VERSION }}-windows-x64
+          path: dist/XLT_Tool-${{ env.VERSION }}-windows-x64.zip
+          archive: false
+          if-no-files-found: error
+
+      # On a tag: onto its release, beside the AppImage (a draft release if there is none yet).
+      # A file already on the release is never replaced: winget and people's downloads check
+      # its SHA-256, so a fix needs a new version.
+      - name: Add to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag *> $null
+          if ($LASTEXITCODE) { gh release create $tag --draft --title "XLT Tool $env:VERSION" --notes "" }
+          $have = @(gh release view $tag --json assets --jq '.assets[].name')
+          foreach ($f in "dist\XLT_Tool-$env:VERSION-windows-x64-setup.exe", "dist\XLT_Tool-$env:VERSION-windows-x64.zip") {
+            $name = Split-Path $f -Leaf
+            if ($have -contains $name) { throw "$name is already on $tag; it is not replaced" }
+            gh release upload $tag $f
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }

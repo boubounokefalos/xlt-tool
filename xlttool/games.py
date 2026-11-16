@@ -31,22 +31,23 @@ REGIONS = {"U": "USA", "E": "Europe", "J": "Japan", "P": "Japan", "K": "Korea", 
 
 # ------------------------------------------------------------------ places --
 
+def _base(xdg: str, win: str, unix: str) -> str:
+    """$XDG_* when set (on Windows too: the tests point it at a temporary folder),
+    else %APPDATA% / %LOCALAPPDATA% on Windows, else the XDG default."""
+    base = os.environ.get(xdg)
+    if not base and sys.platform == "win32":
+        base = os.environ.get(win)
+    return base or os.path.expanduser(unix)
+
+
 def data_dir() -> str:
     """Where XLT Tool keeps what it owns (save backups)."""
-    if sys.platform == "win32":
-        base = os.environ.get("APPDATA") or os.path.expanduser("~")
-    else:
-        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
-    return os.path.join(base, "xlt-tool")
+    return os.path.join(_base("XDG_DATA_HOME", "APPDATA", "~/.local/share"), "xlt-tool")
 
 
 def cache_dir() -> str:
     """What can be made again (the library's index, icons)."""
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    else:
-        base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    return os.path.join(base, "xlt-tool")
+    return os.path.join(_base("XDG_CACHE_HOME", "LOCALAPPDATA", "~/.cache"), "xlt-tool")
 
 
 # --------------------------------------------------------------------- LZ4 --

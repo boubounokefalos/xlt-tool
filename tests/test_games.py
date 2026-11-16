@@ -123,7 +123,7 @@ class Made(unittest.TestCase):
             with open(os.path.join(FIX, "game.cso"), "rb") as f:
                 self.write("ISO/sub/game.cso", f.read())
         lib = games.Library(cache=os.path.join(self.root, "cache"))
-        found = {os.path.relpath(g.path, self.root): g for g in lib.scan([self.root])}
+        found = {os.path.relpath(g.path, self.root).replace(os.sep, "/"): g for g in lib.scan([self.root])}
         want = {"PS1/SLUS00594", "Homebrew/Emu", "loose.pbp"} | ({"ISO/sub/game.cso"} if os.path.isdir(FIX) else set())
         self.assertEqual(set(found), want)
         g = found["PS1/SLUS00594"]
@@ -132,7 +132,7 @@ class Made(unittest.TestCase):
         self.assertTrue(g.pic)
         # again, from the index: the same games
         again = games.Library(cache=os.path.join(self.root, "cache"))
-        self.assertEqual({os.path.relpath(x.path, self.root) for x in again.scan([self.root])}, want)
+        self.assertEqual({os.path.relpath(x.path, self.root).replace(os.sep, "/") for x in again.scan([self.root])}, want)
 
     @unittest.skipUnless(os.path.isdir(FIX), "XLT's fixtures not made")
     def test_image_beside_an_eboot(self):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -18,7 +19,7 @@ from PySide6.QtWidgets import (QAbstractButton, QAbstractItemView, QApplication,
                                QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QTabBar,
                                QToolButton, QVBoxLayout, QWidget)
 
-from . import __version__, convert, devices, media, update
+from . import __version__, convert, devices, games, media, update
 from .gamesview import GamesView
 from . import xltlink
 from .pspsync import PspSync, Upload
@@ -259,8 +260,7 @@ def probe_job(job):
 
 
 def work_dir() -> str:
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    d = os.path.join(base, "xlt-tool", "work")
+    d = os.path.join(games.cache_dir(), "work")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -279,8 +279,7 @@ def open_settings() -> QSettings:
                 s.setValue(k, old.value(k))
         s.setValue("migrated_from_pspconv", True)
         s.sync()
-        base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-        shutil.rmtree(os.path.join(base, "pspconv"), ignore_errors=True)
+        shutil.rmtree(os.path.join(os.path.dirname(games.cache_dir()), "pspconv"), ignore_errors=True)
     return s
 
 
@@ -1057,7 +1056,8 @@ class MainWindow(QMainWindow):
                                   self._psp_label(), "psp:")
         elif psp_key[0] == "no_access":
             self.dest_box.addItem(icon("dialog-password", "dialog-warning"),
-                                  "PSP over USB: allow access…", "pspsetup:")
+                                  "PSP over USB: set up the driver…" if sys.platform == "win32"
+                                  else "PSP over USB: allow access…", "pspsetup:")
         drive = icon("media-flash-memory-stick", "media-flash", "drive-removable-media")
         for s in sticks:
             self.dest_box.addItem(drive, self._stick_label(s), "stick:" + s.mount)

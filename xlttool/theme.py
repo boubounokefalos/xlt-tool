@@ -7,6 +7,7 @@ Sources, in order:
      Button, Selection...), so the app matches custom Plasma schemes.
   3. GNOME: gsettings color-scheme / accent-color / font-name.
   4. GTK settings.ini (prefer-dark / theme name containing "dark").
+On Windows: the registry (apps' light/dark mode, the accent colour) instead.
 
 The palette is applied to Qt's Fusion style, so it looks the same with the
 Qt bundled in the AppImage on any distro (system style plugins such as Breeze
@@ -23,6 +24,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 from dataclasses import dataclass
 
@@ -129,6 +131,11 @@ class PortalWatcher(QObject):
     changed = Signal()
 
     def start(self):
+        if sys.platform == "win32":
+            # No portal: Qt tells when apps' light/dark mode is switched.
+            from PySide6.QtGui import QGuiApplication
+            QGuiApplication.styleHints().colorSchemeChanged.connect(self.changed.emit)
+            return
         threading.Thread(target=self._run, daemon=True,
                          name="portal-watch").start()
 
@@ -324,7 +331,42 @@ def build_palette(c: dict, accent: QColor, dark: bool) -> QPalette:
     return p
 
 
+# -------------------------------------------------------------- Windows ----
+
+def windows_appearance() -> tuple[bool | None, QColor | None]:
+    """Settings → Personalisation → Colours: apps' light/dark mode and the accent colour."""
+    import winreg
+    dark = accent = None
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+            dark = winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
+    except OSError:
+        pass
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\DWM") as k:
+            v = winreg.QueryValueEx(k, "AccentColor")[0]      # 0xAABBGGRR
+            accent = QColor(v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF)
+    except OSError:
+        pass
+    return dark, accent
+
+
+def _detect_windows() -> Theme:
+    dark, accent = windows_appearance()
+    source = "registry" if (dark is not None or accent is not None) else "defaults"
+    dark = bool(dark)
+    accent = accent or QColor(DEFAULT_ACCENT)
+    if dark and accent.lightnessF() < 0.35:
+        accent = accent.lighter(150)    # Windows' dark accents vanish on a dark window
+    colors = _adwaita_colors(dark)
+    # Qt already uses the system's UI font (Segoe UI) on Windows.
+    return Theme(dark, accent, build_palette(colors, accent, dark), None, source)
+
+
 def detect() -> Theme:
+    if sys.platform == "win32":
+        return _detect_windows()
     scheme, accent = portal_appearance()
     source = "portal" if (scheme is not None or accent is not None) else ""
     font = None
@@ -374,7 +416,9 @@ def _indicator_files(t: Theme, border: QColor) -> tuple[str, str, str]:
     """Checkbox images in the current accent color (Fusion's own boxes vanish
     on some light palettes). Written to a per-user temp dir."""
     import tempfile
-    d = os.path.join(tempfile.gettempdir(), f"xlt-tool-{os.getuid()}")
+    # Windows' temp folder is per user already, and it has no getuid().
+    d = os.path.join(tempfile.gettempdir(),
+                     f"xlt-tool-{os.getuid()}" if hasattr(os, "getuid") else "xlt-tool")
     os.makedirs(d, exist_ok=True)
     acc, fg = t.accent.name(), _readable_on(t.accent).name()
     base = t.palette.color(QPalette.Base).name()

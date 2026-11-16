@@ -3,7 +3,8 @@
 XLT Tool is a Python 3 program with a Qt 6 window (PySide6). Conversions are done by ffmpeg and ffprobe (and
 atracdenc for PS1 CD music), run as separate programs; everything else (game readers, CSO, PS1 EBOOTs, ZIP, USB
 sync) is Python. On Linux it ships as one AppImage with its own Python, Qt, ffmpeg and atracdenc, so it needs
-nothing from the system beyond glibc 2.34 and a desktop.
+nothing from the system beyond glibc 2.34 and a desktop. On Windows it is a PyInstaller folder (`XLT Tool.exe`,
+with ffmpeg and atracdenc in `bin\`), as an installer or a portable zip.
 
 ## Modules
 
@@ -26,7 +27,7 @@ nothing from the system beyond glibc 2.34 and a desktop.
 | `covers.py` | Box art from libretro (opt-in) | no |
 | `update.py` | Checking GitHub for a newer release; replacing the AppImage | no |
 | `devices.py` | Finding mounted Memory Sticks | no |
-| `usbaccess.py` | The udev rule for the sync device (Linux) | no |
+| `usbaccess.py` | The udev rule for the sync device (Linux); the WinUSB driver help (Windows) | no |
 
 The modules without Qt are the ones the tests drive directly.
 
@@ -42,20 +43,24 @@ The modules without Qt are the ones the tests drive directly.
 
 ## Where things are kept
 
-| What | Where |
-|---|---|
-| Settings | `~/.config/xlt-tool/xlt-tool.conf` (QSettings) |
-| Library index, icons, box art | `~/.cache/xlt-tool/` |
-| Save backups | `~/.local/share/xlt-tool/saves/<game ID>/<date>/` |
-| PS1 parts copied from your EBOOT | `~/.local/share/xlt-tool/ps1/` |
-| Work files while sending to the PSP | `~/.cache/xlt-tool/work/` |
+| What | Linux | Windows |
+|---|---|---|
+| Settings | `~/.config/xlt-tool/xlt-tool.conf` (QSettings) | the registry, `HKEY_CURRENT_USER\Software\xlt-tool` (QSettings) |
+| Library index, icons, box art | `~/.cache/xlt-tool/` | `%LOCALAPPDATA%\xlt-tool\` |
+| Save backups | `~/.local/share/xlt-tool/saves/<game ID>/<date>/` | `%APPDATA%\xlt-tool\saves\…` |
+| PS1 parts copied from your EBOOT | `~/.local/share/xlt-tool/ps1/` | `%APPDATA%\xlt-tool\ps1\` |
+| Work files while sending to the PSP | `~/.cache/xlt-tool/work/` | `%LOCALAPPDATA%\xlt-tool\work\` |
+
+Uninstalling on Windows leaves these alone.
 
 ## Theme
 
 `theme.py` reads, in order: the xdg-desktop-portal Settings (colour scheme and accent colour; GNOME 47+, KDE
 Plasma 6 and others), KDE's `kdeglobals` (the full colour scheme), GNOME's gsettings, and GTK's `settings.ini`.
 The palette is applied to Qt's Fusion style, so the bundled Qt looks the same on every distro, and it follows
-changes while running. Icons come from the desktop's icon theme; file dialogs go through the portal.
+changes while running. Icons come from the desktop's icon theme; file dialogs go through the portal. On
+Windows the registry gives apps' light/dark mode and the accent colour (Settings → Personalisation → Colours),
+Qt tells when they change, and the font is the system's (Segoe UI).
 
 ## Updates
 

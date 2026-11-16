@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -62,6 +63,12 @@ def _bundled(name: str) -> str | None:
         p = os.path.join(appdir, "usr", "bin", name)
         if os.access(p, os.X_OK):
             return p
+    if sys.platform == "win32":
+        # The Windows build keeps them beside XLT Tool.exe, or in its bin folder.
+        here = os.path.dirname(sys.executable)
+        for p in (os.path.join(here, name + ".exe"), os.path.join(here, "bin", name + ".exe")):
+            if os.path.isfile(p):
+                return p
     return shutil.which(name)
 
 

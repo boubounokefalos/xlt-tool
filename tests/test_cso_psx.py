@@ -165,11 +165,21 @@ class Ps1(unittest.TestCase):
         self.assertEqual(toc[30:40], bytes([0x41, 0, 1, 0, 2, 1, 0, 0, 2, 0]))
         self.assertEqual(toc[40:50], bytes([0x01, 0, 2, 0, 4, 0x25, 0, 0, 6, 0x25]))  # 00:04:25, +2 s
         self.assertEqual(toc[27:30], bytes([0, 5, 0x26]))  # lead-out: sector 401 = 00:05:26
-        enc = os.path.join(self.t, "atracdenc")
-        with open(enc, "w") as f:  # writes a 0x60-byte header and the input's size, as text
-            f.write("#!/bin/sh\nin=\"$3\"; out=\"$5\"\nhead -c 96 /dev/zero > \"$out\"\n"
-                    "printf 'AT3:%s' $(wc -c < \"$in\") >> \"$out\"\n")
-        os.chmod(enc, 0o755)
+        # The stand-in writes a 0x60-byte header and the input's size, as text.
+        if sys.platform == "win32":
+            script = os.path.join(self.t, "atracdenc.py")
+            with open(script, "w") as f:
+                f.write("import os, sys\nwith open(sys.argv[5], 'wb') as o:\n"
+                        "    o.write(bytes(96) + b'AT3:%d' % os.path.getsize(sys.argv[3]))\n")
+            enc = os.path.join(self.t, "atracdenc.cmd")
+            with open(enc, "w") as f:
+                f.write(f'@"{sys.executable}" "{script}" %*\n')
+        else:
+            enc = os.path.join(self.t, "atracdenc")
+            with open(enc, "w") as f:
+                f.write("#!/bin/sh\nin=\"$3\"; out=\"$5\"\nhead -c 96 /dev/zero > \"$out\"\n"
+                        "printf 'AT3:%s' $(wc -c < \"$in\") >> \"$out\"\n")
+            os.chmod(enc, 0o755)
         os.environ["XLTTOOL_ATRACDENC"] = enc
         try:
             music = psx.encode_music(cue)
