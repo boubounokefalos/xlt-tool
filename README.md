@@ -79,7 +79,7 @@ Download `XLT_Tool-<version>-windows-x64-setup.exe` from the releases page and r
 USB sync nothing else is needed: Windows sets the PSP up by itself the first time. The `.zip` is the same app,
 portable: unzip it anywhere and start `XLT Tool.exe`. It runs on Windows 10 and 11, 64-bit.
 
-XLT Tool isn't signed (a certificate costs money every year; it is a free, community-built tool), so Windows
+XLT Tool isn't signed (it is a free, community-built tool), so Windows
 treats it as unknown:
 
 - **"Windows protected your PC"** (SmartScreen) shows when you start the downloaded installer: choose
