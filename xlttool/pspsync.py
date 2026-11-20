@@ -32,6 +32,14 @@ def _backend():
         return None
 
 
+def _drop(link):
+    """None, after letting the device go at once: a link only dropped is collected by Python
+    much later, and until then Windows keeps the PSP from XLT Cast."""
+    if link is not None:
+        link.close()
+    return None
+
+
 class Upload:
     """A finished job's files to send: main is the converted file, the rest go
     with it (.THM, .srt, .lrc share its name on the PSP; book parts have their own)."""
@@ -182,10 +190,10 @@ class PspSync(QObject):
                 except xltlink.LinkError as e:
                     text = str(e)
                     self._set("no_access" if "ermission" in text else "none" if "No XLT" in text else "error", text)
-                    link = None
+                    link = _drop(link)
                 except Exception as e:  # noqa: BLE001 - usb errors while opening: try again later
                     self._set("error", str(e))
-                    link = None
+                    link = _drop(link)
             try:
                 up = self._q.get(timeout=LOOK_EVERY if link is None else HELLO_EVERY)
             except queue.Empty:
@@ -202,7 +210,7 @@ class PspSync(QObject):
                             link.hello()
                         last = time.monotonic()
                     except Exception:  # noqa: BLE001 - unplugged, or XLT closed
-                        link = None
+                        link = _drop(link)
                         self.power_info = None
                         self._set("none")
                 continue
@@ -216,13 +224,13 @@ class PspSync(QObject):
                     self._task_finish(up, "")
                 except InterruptedError:
                     self._task_finish(up, "cancelled")
-                    link = None  # stopped in the middle of a transfer: start over after the PSP's timeout
+                    link = _drop(link)  # stopped in the middle of a transfer: start over after the PSP's timeout
                     time.sleep(3.5)
                 except xltlink.XltsError as e:
                     self._task_finish(up, f"The PSP said no: {e}")
                 except Exception as e:  # noqa: BLE001 - the link went: the next look finds out
                     self._task_finish(up, f"The PSP stopped answering: {e}")
-                    link = None
+                    link = _drop(link)
                     self._set("none")
                 finally:
                     self._current = None
@@ -239,23 +247,18 @@ class PspSync(QObject):
                 self._finish(up, "cancelled", [])
                 # stopped in the middle of a file: the PSP waits for the rest until its
                 # 3 s timeout, so the link starts over after that
-                link = None
+                link = _drop(link)
                 time.sleep(3.5)
             except xltlink.XltsError as e:
                 self._finish(up, f"The PSP said no: {e}", [])
             except Exception as e:  # noqa: BLE001 - the link went: the next look finds out
                 self._finish(up, f"Sending to the PSP failed: {e}", [])
-                link = None
+                link = _drop(link)
                 self._set("none")
             finally:
                 self._current = None
                 last = time.monotonic()
-        try:
-            if link is not None:
-                import usb.util
-                usb.util.dispose_resources(link.dev)
-        except Exception:  # noqa: BLE001
-            pass
+        _drop(link)
 
     def _send(self, link: xltlink.Link, up: Upload) -> list[str]:
         if up.thm_cmd:  # the XMB thumbnail, made now so it goes with the video

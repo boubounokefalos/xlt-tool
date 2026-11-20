@@ -508,6 +508,12 @@ class MainWindow(QMainWindow):
         top.addWidget(self.zip_btn)
         top.addWidget(self.clear_btn)
         top.addStretch(1)
+        self.cast_btn = QPushButton("Cast")
+        set_icon(self.cast_btn, "video-display-symbolic", "video-display", "computer")
+        self.cast_btn.setToolTip("XLT Cast: the game you play on the PSP, live in a window. On the PSP: "
+                                 "XLT > Settings > XLT > XLT Cast on, then L+R+SELECT in a game")
+        self.cast_btn.clicked.connect(self.open_cast)
+        top.addWidget(self.cast_btn)
         menu_btn = QToolButton()
         set_icon(menu_btn, "open-menu-symbolic", "application-menu", "open-menu")
         if menu_btn.icon().isNull():
@@ -1030,6 +1036,19 @@ class MainWindow(QMainWindow):
                 j.sub = self._auto_sub(j.info)
                 self._refresh_row(j)
         self._options_changed()
+
+    # ------------------------------------------------------------- cast --
+    def open_cast(self):
+        """The XLT Cast window (one): the PSP's game, live."""
+        from .castview import CastWindow
+        w = getattr(self, "_cast_win", None)
+        if w is None or not w.isVisible():
+            w = self._cast_win = CastWindow(self.settings)
+            w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+            w.destroyed.connect(lambda *_: setattr(self, "_cast_win", None))
+            w.show()
+        w.raise_()
+        w.activateWindow()
 
     # -------------------------------------------------------- destinations --
     def refresh_destinations(self):
@@ -2025,6 +2044,8 @@ class MainWindow(QMainWindow):
                 self._remove_quiet(getattr(self.current, "part", self.current.output + ".part"))
             self._cleanup_proc()
         self._save_settings()
+        if getattr(self, "_cast_win", None) is not None:
+            self._cast_win.close()  # it stops casting and lets the PSP go
         self.psp.stop()
         super().closeEvent(e)
         if e.isAccepted() and self._restart_after:

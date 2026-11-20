@@ -78,6 +78,7 @@ python3 -I -m unittest discover -s tests
 | `test_cso_psx.py` | ISO → CSO → ISO byte for byte; PS1 EBOOTs: the PSISOIMG layout, the index and SHA-1s, the TOC from cue sheets, the audio table, multi-disc PSTITLEIMG |
 | `test_covers.py` | Box art against pretend libretro lists: names by ID, another region's art, the cache |
 | `test_update.py` | The update check against a pretend GitHub: version order, the download checks, the swap |
+| `test_castview.py` | The XLT Cast window against a pretend PSP that sends frames: 16-bit and 32-bit colours, the picture in whole steps, fps, a screenshot at 480×272, waiting again when the cable goes, STOP sent when the window closes (Qt offscreen) |
 
 ## The README's media
 

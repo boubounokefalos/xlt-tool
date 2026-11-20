@@ -31,6 +31,8 @@ XLT keeps running.
   discs in one. ISO games can be shrunk to CSO.
 - **Straight to the PSP.** Over XLT's USB sync, each file goes where XLT looks for it while the next one
   converts; or to a Memory Stick, or any folder.
+- **XLT Cast: your PSP game on the PC.** The game you're playing on the PSP, live in a window with its sound,
+  over the same USB cable: full screen, sharp pixels, screenshots.
 - **Box art** for PSP and PS1 games from the libretro project, only if you turn it on.
 - **Fits your desktop.** Follows light and dark mode, the accent colour and the font (GNOME, KDE Plasma,
   Windows and others), uses your file dialogs, and tells you about new versions (the AppImage updates itself).
@@ -88,6 +90,25 @@ treats it as unknown:
 - If an antivirus, Windows Defender included, says XLT Tool is a threat, that's a false positive common to
   unsigned Python programs. You can send the file to [Microsoft](https://www.microsoft.com/en-us/wdsi/filesubmission)
   to have it checked; please [open an issue](https://github.com/boubounokefalos/xlt-tool/issues) too.
+
+## XLT Cast: the PSP's game on the PC
+
+Press **Cast** at the top of XLT Tool and the game you're playing on the PSP shows in a window, live and with its
+sound, over the same USB cable. To set it up, turn on **Settings → XLT → XLT Cast** in XLT once. Then, in a game,
+with the cable in, **L+R+SELECT** starts or stops casting, and **HOME** stops it too.
+
+- **Picture:** 480×272 as the PSP draws it, as big as the window allows. **Sharp pixels** keeps every PSP pixel
+  square, in whole steps; double-click or **F11** for full screen, **Ctrl+S** for a screenshot (saved at
+  480×272 in Pictures/XLT Cast).
+- **Sound:** the game's own, with a volume slider and mute.
+- **Speed:** most games come through at their own speed (30 fps for most 3D games), and the game on the PSP keeps
+  its speed. Games in 32-bit colour, and homebrew ports that already use the whole PSP, are slower; for those,
+  **Every other frame** keeps the game on the PSP smooth, at half the frames on the PC.
+- **What it can't cast:** XLT itself, and games that use USB themselves (camera, GPS). USB sync and Cast take
+  turns: sync comes back when casting stops.
+
+On Linux it uses the same access as USB sync; on Windows, Windows sets it up by itself the first time. How it
+works: [XLT Cast](docs/Cast.md).
 
 ## USB sync or USB mode?
 

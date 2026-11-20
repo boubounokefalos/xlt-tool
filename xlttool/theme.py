@@ -437,7 +437,9 @@ def _indicator_files(t: Theme, border: QColor) -> tuple[str, str, str]:
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(svg)
-        paths.append(path)
+        # forward slashes: in the stylesheet's url("...") a Windows backslash is an escape, and the whole
+        # stylesheet failed to parse ("Could not parse application stylesheet"), so none of it applied
+        paths.append(path.replace(os.sep, "/"))
     return tuple(paths)
 
 

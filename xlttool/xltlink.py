@@ -45,6 +45,7 @@ PYUSB_MISSING = ("pyusb is missing: install python-pyusb (Arch), python3-usb (De
 
 VID, PID = 0x054C, 0x01CB
 SUBCLASS, PROTOCOL = 0x58, 0x53
+CAST_PROTOCOL = 0x43  # XLT Cast (plugin/xltcast): the same IDs and subclass, while a game is cast
 VENDOR_REQ = 0x58
 GUID = "{AE1513B4-0AA3-4365-B951-3261C67CE994}"
 MAGIC = 0x53544C58
@@ -206,6 +207,28 @@ class Link:
                             "If it is, unplug the cable and plug it in again.")
         self.dev = dev
         try:
+            self._setup(dev)
+        except BaseException:
+            self.close()  # it may be open already: let it go now, not when Python collects it
+            raise
+
+    def close(self):
+        """Lets the device go at once. Until then Windows keeps it from everyone else, XLT Cast
+        included when the PSP comes back as Cast's device (the same IDs, the same Windows device)."""
+        try:
+            usb.util.dispose_resources(self.dev)
+        except Exception:  # noqa: BLE001 - gone already
+            pass
+
+    def _setup(self, dev):
+        try:  # from the descriptor the system keeps: no need to open the device
+            casting = any(i.bInterfaceSubClass == SUBCLASS and i.bInterfaceProtocol == CAST_PROTOCOL for i in dev[0])
+        except (usb.core.USBError, IndexError):
+            casting = False
+        if casting:
+            # Before opening: on Windows the Cast window holds it, and opening fails as if the driver were wrong
+            raise LinkError("No XLT sync device: the PSP is casting a game (XLT Cast)")
+        try:
             # Only when not set up yet: setting the configuration again makes the PSP
             # start over (it cancels what it was waiting for, then attaches anew).
             try:
@@ -227,6 +250,9 @@ class Link:
         intf = usb.util.find_descriptor(cfg, bInterfaceClass=0xFF, bInterfaceSubClass=SUBCLASS)
         if intf is None:
             raise LinkError("The device has no XLT sync interface")
+        if intf.bInterfaceProtocol == CAST_PROTOCOL:
+            # the same IDs, but XLT Cast's device (a game is being cast): not ours to open
+            raise LinkError("No XLT sync device: the PSP is casting a game (XLT Cast)")
         try:
             usb.util.claim_interface(dev, intf)
         except usb.core.USBError as e:
