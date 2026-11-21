@@ -104,7 +104,7 @@ with the cable in, **L+R+SELECT** starts or stops casting, and **HOME** stops it
 - **Speed:** most games come through at their own speed (30 fps for most 3D games), and the game on the PSP keeps
   its speed. Games in 32-bit colour, and homebrew ports that already use the whole PSP, are slower; for those,
   **Every other frame** keeps the game on the PSP smooth, at half the frames on the PC.
-- **What it can't cast:** XLT itself, and games that use USB themselves (camera, GPS). USB sync and Cast take
+- **What it can't cast:** PS1 (POPS) games, not yet; XLT itself; and games that use USB themselves (camera, GPS). USB sync and Cast take
   turns: sync comes back when casting stops.
 
 On Linux it uses the same access as USB sync; on Windows, Windows sets it up by itself the first time. How it
