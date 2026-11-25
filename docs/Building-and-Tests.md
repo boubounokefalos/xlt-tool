@@ -85,4 +85,5 @@ python3 -I -m unittest discover -s tests
 `tools/make_demo_media.py` renders the README's screenshots, the walk-through video and its GIF teaser from the
 real window, offscreen, over a made-up library: the games, their icons, songs and pictures are generated, the
 PSP is a pretend one (a folder answering like XLT's sync), and box art stays off, so nothing in them belongs to
-anyone else. It needs the same Python as `run-dev.sh` and ffmpeg.
+anyone else. It needs the same Python as `run-dev.sh` and ffmpeg. The README links the walk-through on YouTube
+(https://youtu.be/Evb9TZlb8BA), so a new render has to be uploaded there again.
