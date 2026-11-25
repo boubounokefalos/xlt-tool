@@ -546,6 +546,19 @@ def stylesheet(t: Theme) -> str:
         background: {QColor(acc.red(), acc.green(), acc.blue(), 48).name(QColor.HexArgb)};
         color: palette(text);  /* on the pale tint, not the white meant for a full accent */
     }}
+    QTreeWidget#files, QListWidget#places {{
+        background: {card.name()}; border: 1px solid {border.name()};
+        border-radius: 10px; padding: 4px; outline: none;
+    }}
+    QTreeWidget#files::item, QListWidget#places::item {{ border-radius: 6px; padding: 3px 2px; }}
+    QTreeWidget#files::item:selected, QListWidget#places::item:selected {{
+        background: {QColor(acc.red(), acc.green(), acc.blue(), 48).name(QColor.HexArgb)};
+        color: palette(text);
+    }}
+    QTreeWidget#files QHeaderView::section {{
+        background: transparent; border: none; border-bottom: 1px solid {border.name()};
+        padding: 4px 6px; color: {muted}; font-weight: 600;
+    }}
     QFrame#card {{
         background: {card.name()}; border: 1px solid {border.name()};
         border-radius: 10px;

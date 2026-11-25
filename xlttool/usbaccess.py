@@ -1,6 +1,7 @@
 """Access to the PSP over USB.
 
-Linux: a udev rule for XLT's sync device. Without it only root may open the device.
+Linux: a udev rule for XLT's sync device, and for USBNet's (the PSP while USBNet has the
+cable, usbnet.py). Without it only root may open the device.
 The rule (the same as XLT's tools/60-xltsync.rules) gives the logged-in user access
 (systemd-logind or elogind's "uaccess"), and is put in place with pkexec, the
 desktop's own password prompt. If there is no pkexec, the commands are shown to copy.
@@ -19,9 +20,11 @@ import sys
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 RULE_PATH = "/etc/udev/rules.d/60-xltsync.rules"
-RULE = """# XLT's USB sync link: lets the logged-in user send files to a PSP running XLT.
+RULE = """# XLT's USB sync link: lets the logged-in user send files to a PSP running XLT,
+# and USBNet's: lets XLT Tool be the PSP's router for internet over the cable.
 # Installed by XLT Tool. Remove this file to take the access away again.
 SUBSYSTEM=="usb", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="01cb", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="01c9", TAG+="uaccess"
 """
 # $1: the rule in a temporary file. The trigger applies it to a PSP already plugged in.
 SCRIPT = (f'install -m 644 "$1" {RULE_PATH} && udevadm control --reload && '
@@ -53,8 +56,8 @@ def _offer_windows(parent, app: str) -> bool:
     return False
 
 
-def offer(parent) -> bool:
-    """Explains, asks, installs. True if the rule went in."""
+def offer(parent, what: str = "To send files to the PSP over USB") -> bool:
+    """Explains, asks, installs. True if the rule went in. what: why, for the question."""
     app = parent.windowTitle() if parent else "XLT Tool"
     if sys.platform == "win32":
         return _offer_windows(parent, app)
@@ -63,7 +66,7 @@ def offer(parent) -> bool:
                 "sudo udevadm trigger --action=add --subsystem-match=usb --attr-match=idVendor=054c")
     if not shutil.which("pkexec"):
         box = QMessageBox(QMessageBox.Icon.Information, app,
-                          "To send files to the PSP over USB, Linux needs a rule that lets you use it. "
+                          f"{what}, Linux needs a rule that lets you use it. "
                           "Run these commands in a terminal (they ask for your password):",
                           parent=parent)
         box.setDetailedText(commands)
@@ -75,7 +78,7 @@ def offer(parent) -> bool:
         return False
     if QMessageBox.question(
             parent, app,
-            "To send files to the PSP over USB, Linux needs a rule that lets you use it "
+            f"{what}, Linux needs a rule that lets you use it "
             f"({RULE_PATH}). Your password is asked for once to add it.\n\nAdd it now?") \
             != QMessageBox.StandardButton.Yes:
         return False

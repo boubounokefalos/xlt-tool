@@ -59,7 +59,7 @@ MAGIC = 0x43544C58
 VERSION = 3
 REPLY = 0x8000
 H, PIECE_ROWS = 272, 64
-HELLO, START, STOP, STATS, FRAME, AUDIO = 1, 2, 3, 4, 0x10, 0x11
+HELLO, START, STOP, STATS, FRAME, AUDIO, NOP = 1, 2, 3, 4, 0x10, 0x11, 0x12
 DIRECT, COPY = 1, 2
 # way -> (mode, copy method)
 WAYS = {"direct": (DIRECT, 0), "auto": (COPY, 0), "uncached": (COPY, 1), "cached": (COPY, 2)}
@@ -206,12 +206,15 @@ class Cast:
     def read_message(self, timeout: int = TIMEOUT):
         """("frame", Frame), ("audio", (rate, first sample, 16-bit stereo bytes))
         or ("reply", (op, status, seq, payload))."""
-        raw = bytes(self.ep_in.read(512, timeout))
-        if len(raw) != HDR.size:
-            raise CastError(f"a message of {len(raw)} bytes, not a header")
-        magic, op, status, seq, n, a, b, c, d = HDR.unpack(raw)
-        if magic != MAGIC:
-            raise CastError(f"bad magic {magic:08x}")
+        while True:
+            raw = bytes(self.ep_in.read(512, timeout))
+            if len(raw) != HDR.size:
+                raise CastError(f"a message of {len(raw)} bytes, not a header")
+            magic, op, status, seq, n, a, b, c, d = HDR.unpack(raw)
+            if magic != MAGIC:
+                raise CastError(f"bad magic {magic:08x}")
+            if op != NOP:  # in PS1 games each message ends with one (POPS holds the last transfer back)
+                break
         if op == FRAME:
             row = b * (4 if a == 3 else 2)
             parts = []

@@ -33,6 +33,12 @@ XLT keeps running.
   converts; or to a Memory Stick, or any folder.
 - **XLT Cast: your PSP game on the PC.** The game you're playing on the PSP, live in a window with its sound,
   over the same USB cable: full screen, sharp pixels, screenshots.
+- **The PSP's folders, from the PC.** The **Files** tab shows XLT's folders on the PSP (videos, music, pictures,
+  books, downloads, ISO, PSP/GAME and the saves): send files or whole folders, copy them to the PC, rename, make
+  folders, delete. Saves are backed up before they are deleted.
+- **Internet for the PSP over the cable.** The **Internet** button makes the PC the PSP's router, with
+  [USBNet](https://github.com/chriopter/pspkit-usbnet) by chriopter, which XLT Tool downloads and sets up.
+- **Update XLT over USB.** **⋮ → Update XLT on the PSP** sends the latest XLT to the PSP, with no Wi-Fi.
 - **Box art** for PSP and PS1 games from the libretro project, only if you turn it on.
 - **Fits your desktop.** Follows light and dark mode, the accent colour and the font (GNOME, KDE Plasma,
   Windows and others), uses your file dialogs, and tells you about new versions (the AppImage updates itself).
@@ -104,11 +110,28 @@ with the cable in, **L+R+SELECT** starts or stops casting, and **HOME** stops it
 - **Speed:** most games come through at their own speed (30 fps for most 3D games), and the game on the PSP keeps
   its speed. Games in 32-bit colour, and homebrew ports that already use the whole PSP, are slower; for those,
   **Every other frame** keeps the game on the PSP smooth, at half the frames on the PC.
-- **What it can't cast:** PS1 (POPS) games, not yet; XLT itself; and games that use USB themselves (camera, GPS). USB sync and Cast take
+- **PS1 games:** the picture, no sound yet (with XLT 1.4.0 or later).
+- **What it can't cast:** XLT itself; and games that use USB themselves (camera, GPS). USB sync and Cast take
   turns: sync comes back when casting stops.
 
 On Linux it uses the same access as USB sync; on Windows, Windows sets it up by itself the first time. How it
 works: [XLT Cast](docs/Cast.md).
+
+## Internet for the PSP over USB
+
+With XLT 1.4.0 or later, the PSP can use the PC's internet through the USB cable, with
+[USBNet](https://github.com/chriopter/pspkit-usbnet) by chriopter (MIT). XLT Tool downloads USBNet's latest
+release from GitHub (checked against GitHub's SHA-256) and keeps it up to date.
+
+1. In XLT, turn on **Settings → Network → Internet over USB**. With the PSP on USB sync, press **Internet** in XLT
+   Tool once: if USBNet isn't on the PSP yet, XLT Tool sends it and XLT installs it at its next start (a USBNet
+   you installed yourself, with PSPDX for instance, is left as it is).
+2. Keep **Internet** pressed in XLT Tool while the PSP is online. On the PSP, connect to **Hi-Speed USB**.
+
+USB sync and the internet share the cable: inside XLT, sync waits while the browser is online over USB and comes
+back when it closes. On Linux it uses the same access as USB sync. On Windows it runs out of sight too; only the
+first time, when Windows has no driver for the PSP's USBNet device yet, it opens a window of its own and installs
+the driver there (Windows asks first).
 
 ## USB sync or USB mode?
 
@@ -160,7 +183,8 @@ and the Windows build bundle, each under its own licence:
 [PyInstaller](https://pyinstaller.org/) and its installer made with [Inno Setup](https://jrsoftware.org/isinfo.php).
 The PS1 EBOOT layout follows what [pop-fe](https://github.com/sahlberg/pop-fe) writes; box art comes from
 [libretro-database](https://github.com/libretro/libretro-database) and
-[libretro-thumbnails](https://github.com/libretro-thumbnails). The full list, with what each is used for:
+[libretro-thumbnails](https://github.com/libretro-thumbnails); the Internet button downloads and runs
+[USBNet](https://github.com/chriopter/pspkit-usbnet) by chriopter (MIT). The full list, with what each is used for:
 **[License and credits](docs/Credits.md)**.
 
 ## Trademarks

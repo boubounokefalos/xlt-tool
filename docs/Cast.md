@@ -28,6 +28,8 @@ protocol is version 3). The PC sends `START` (copy mode, every K-th frame) and `
   the time the last one took to send.
 - **Sound:** `AUDIO` messages of up to 2048 stereo 16-bit frames at 44.1 kHz. The plugin hooks the game's
   `sceAudio` calls and mixes every channel the game plays on the PSP's clock.
+- **NOP** (op 0x12, PS1 games only): ends every message there; `read_message` skips it. PS1 games send no
+  sound yet (POPS doesn't use the hooked `sceAudio` calls).
 
 ## The PSP side's timing
 

@@ -19,14 +19,16 @@ from PySide6.QtWidgets import (QAbstractButton, QAbstractItemView, QApplication,
                                QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QTabBar,
                                QToolButton, QVBoxLayout, QWidget)
 
-from . import __version__, convert, devices, games, media, update
+from . import __version__, convert, devices, games, media, update, xltupdate
+from .filesview import FilesView
 from .gamesview import GamesView
 from . import xltlink
-from .pspsync import PspSync, Upload
+from .pspsync import PspSync, Task, Upload
 from .tagdialog import TagDialog
 
 APP_NAME = "XLT Tool"
-VIEW_LIBRARY, VIEW_CONVERT = 0, 1   # the tabs at the top
+VIEW_LIBRARY, VIEW_CONVERT, VIEW_FILES = 0, 1, 2   # the tabs at the top
+VIEW_NAMES = ("library", "convert", "files")
 
 # which settings tab each kind of job belongs to
 KIND_TAB = {"video": 0, "audio": 1, "image": 2, "text": 3, "sub": 3, "archive": 3, "lyrics": 1,
@@ -147,6 +149,12 @@ class UpdateSignals(QObject):
     checked = Signal(object, str, bool)   # Release or None, error, asked by the user
     progress = Signal(float)
     done = Signal(str, str)               # version, error ("" = in place, "cancelled")
+
+
+class XltUpdateSignals(QObject):
+    checked = Signal(object, str)         # XltRelease or None, error (GitHub)
+    fetched = Signal(object, str, str)    # EBOOT bytes or None, version, error ("cancelled")
+    progress = Signal(float)
 
 
 class CopySignals(QObject):
@@ -451,6 +459,7 @@ class MainWindow(QMainWindow):
         self.psp.drained.connect(self._psp_drained)
         self.psp.power.connect(lambda _p: self.refresh_destinations())
         self.games_view.attach_psp(self.psp)
+        self.files_view.attach_psp(self.psp)
         self._psp_was_ready = False
         self.update_signals = UpdateSignals()
         self.update_signals.checked.connect(self._update_checked)
@@ -459,6 +468,15 @@ class MainWindow(QMainWindow):
         self.update_signals.done.connect(self._update_done)
         self._update_progress = None
         self._restart_after = ""
+        self.xlt_signals = XltUpdateSignals()
+        self.xlt_signals.checked.connect(self._xlt_checked)
+        self.xlt_signals.fetched.connect(self._xlt_fetched)
+        self.xlt_signals.progress.connect(self._xlt_set_progress)
+        self.psp.task_done.connect(self._xlt_task_done)
+        self.psp.task_progress.connect(lambda t, f, _x: t.name == "xlt-send" and self._xlt_set_progress(f))
+        self._xlt_progress = None
+        self._xlt_rel = None
+        self._setup_net_share()
         QTimer.singleShot(4000, self.check_updates)
         self.nvenc_signals = NvencSignals()
         self.nvenc_signals.result.connect(self._nvenc_result)
@@ -488,6 +506,8 @@ class MainWindow(QMainWindow):
         self.view_tabs.setDrawBase(False)
         self.view_tabs.addTab("Library")   # VIEW_LIBRARY
         self.view_tabs.addTab("Convert")   # VIEW_CONVERT
+        self.view_tabs.addTab("Files")     # VIEW_FILES
+        self.view_tabs.setTabToolTip(VIEW_FILES, "XLT's folders on the PSP, over USB sync")
         top.addWidget(self.view_tabs)
         top.addSpacing(12)
         self.add_btn = QPushButton("Add files")
@@ -514,6 +534,11 @@ class MainWindow(QMainWindow):
                                  "XLT > Settings > XLT > XLT Cast on, then L+R+SELECT in a game")
         self.cast_btn.clicked.connect(self.open_cast)
         top.addWidget(self.cast_btn)
+        self.net_btn = QPushButton("Internet")
+        set_icon(self.net_btn, "network-wired-symbolic", "network-wired", "network-workgroup")
+        self.net_btn.setCheckable(True)
+        self.net_btn.toggled.connect(self.set_net_share)
+        top.addWidget(self.net_btn)
         menu_btn = QToolButton()
         set_icon(menu_btn, "open-menu-symbolic", "application-menu", "open-menu")
         if menu_btn.icon().isNull():
@@ -532,6 +557,10 @@ class MainWindow(QMainWindow):
         self.auto_update_action.toggled.connect(
             lambda on: self.settings.setValue("update_check", "true" if on else "false"))
         menu.addAction(self.auto_update_action)
+        xlt_update = QAction("Update XLT on the PSP…", self)
+        xlt_update.setToolTip("Sends a newer XLT to the PSP over USB sync; the PSP installs it, no Wi-Fi needed")
+        xlt_update.triggered.connect(self.update_xlt)
+        menu.addAction(xlt_update)
         menu.addSeparator()
         self.art_action = QAction("Box art for games", self, checkable=True)
         self.art_action.setToolTip("Covers for PSP and PS1 games from the libretro project, in the Library "
@@ -745,12 +774,18 @@ class MainWindow(QMainWindow):
         self.games_view.covers_changed.connect(self._covers_changed)
         self.views.addWidget(self.games_view)      # VIEW_LIBRARY
         self.views.addWidget(self.convert_page)    # VIEW_CONVERT
+        self.files_view = FilesView(self.settings)
+        self.files_view.changed.connect(lambda: self.games_view.refresh(pc=False))  # its games, free space
+        self.files_view.space = lambda: ((self.games_view.psp_state.free, self.games_view.psp_state.total)
+                                         if self.games_view.psp_state else None)
+        self.files_view.xlt_folder = lambda: self.games_view.psp_state.xlt if self.games_view.psp_state else ""
+        self.views.addWidget(self.files_view)      # VIEW_FILES
         outer.addWidget(self.views, 1)
         self.view_tabs.currentChanged.connect(self._view_changed)
         name = self.settings.value("view_name", "")
         if not name:  # before Library came first: "view" was 0 Convert, 1 Games
             name = "library" if str(self.settings.value("view", 1)) == "1" else "convert"
-        self.view_tabs.setCurrentIndex(VIEW_CONVERT if name == "convert" else VIEW_LIBRARY)
+        self.view_tabs.setCurrentIndex(VIEW_NAMES.index(name) if name in VIEW_NAMES else VIEW_LIBRARY)
         self._view_changed(self.view_tabs.currentIndex())
 
         self.setCentralWidget(root)
@@ -826,7 +861,7 @@ class MainWindow(QMainWindow):
 
     def _view_changed(self, i: int):
         self.views.setCurrentIndex(i)
-        self.settings.setValue("view_name", "convert" if i == VIEW_CONVERT else "library")
+        self.settings.setValue("view_name", VIEW_NAMES[i])
         for b in (self.add_btn, self.folder_btn, self.zip_btn, self.clear_btn):
             b.setVisible(i == VIEW_CONVERT)
 
@@ -1049,6 +1084,57 @@ class MainWindow(QMainWindow):
             w.show()
         w.raise_()
         w.activateWindow()
+
+    # ------------------------------------------------ internet (USBNet) --
+    NET_TIP = ("Internet for the PSP over the USB cable, with USBNet (by chriopter, "
+               "github.com/chriopter/pspkit-usbnet): this PC is the PSP's router. On the PSP: "
+               "XLT > Settings > Network > Internet over USB, then connect with \"Hi-Speed USB\"")
+    NET_TEXT = {"off": "Internet", "starting": "Internet: starting", "waiting": "Internet: waiting",
+                "online": "Internet: on", "no_access": "Internet: no access", "busy": "Internet: busy",
+                "error": "Internet"}
+
+    def _setup_net_share(self):
+        """Called once the window is built: USBNet's gateway, on again if it was on when the app closed."""
+        from .usbnetview import UsbNet
+        self._net = UsbNet(self, psp=self.psp)
+        self._net_asked_access = False
+        self._net.state.connect(self._net_state_changed)
+        self._net.line.connect(lambda _text: self._net_tip())
+        self._net.staged.connect(lambda text: QMessageBox.information(self, APP_NAME, text))
+        self._net_tip()
+        on = str(self.settings.value("internet", "false")).lower() == "true"
+        self.net_btn.setChecked(on)  # starts it through set_net_share
+
+    def set_net_share(self, on: bool):
+        net = getattr(self, "_net", None)
+        if net is None:
+            return
+        self.settings.setValue("internet", "true" if on else "false")
+        if on:
+            net.start()
+        else:
+            net.stop()
+
+    def _net_state_changed(self, kind: str, text: str):
+        if kind in ("off", "error") and self.net_btn.isChecked() and not self._net.running():
+            self.net_btn.blockSignals(True)  # it stopped by itself: the saved choice stays
+            self.net_btn.setChecked(False)
+            self.net_btn.blockSignals(False)
+        self.net_btn.setText(self.NET_TEXT.get(kind, "Internet"))
+        self._net_tip()
+        if kind == "no_access" and not self._net_asked_access and sys.platform.startswith("linux"):
+            self._net_asked_access = True
+            from . import usbaccess
+            usbaccess.offer(self, "To be the PSP's router over the USB cable")
+
+    def _net_tip(self):
+        tip = self.NET_TIP
+        net = getattr(self, "_net", None)
+        if net is not None and net.text:
+            tip += "\n\n" + net.text[:1].upper() + net.text[1:]
+        if net is not None and net.lines:
+            tip += "\n" + net.lines[-1]
+        self.net_btn.setToolTip(tip)
 
     # -------------------------------------------------------- destinations --
     def refresh_destinations(self):
@@ -2009,17 +2095,22 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- d & d --
     def dragEnterEvent(self, e):
-        if e.mimeData().hasUrls():
+        if e.mimeData().hasUrls() and self.view_tabs.currentIndex() != VIEW_FILES:  # (Files takes its own)
             e.acceptProposedAction()
 
     def dropEvent(self, e):
         paths = [u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()]
-        if paths:
+        if paths and self.view_tabs.currentIndex() != VIEW_FILES:
             self.view_tabs.setCurrentIndex(VIEW_CONVERT)  # dropped files are for converting
             self.add_paths(paths)
             e.acceptProposedAction()
 
     def closeEvent(self, e):
+        if self.files_view.busy():
+            if QMessageBox.question(self, "Stop?", "Files are being copied, sent or deleted on the PSP "
+                                    "(Files tab). Stop and quit?") != QMessageBox.StandardButton.Yes:
+                e.ignore()
+                return
         if self.games_view.copying():
             if QMessageBox.question(self, "Stop copying?",
                                     "A game or its saves are being copied between this PC and the PSP. Stop and quit?") \
@@ -2046,6 +2137,8 @@ class MainWindow(QMainWindow):
         self._save_settings()
         if getattr(self, "_cast_win", None) is not None:
             self._cast_win.close()  # it stops casting and lets the PSP go
+        if getattr(self, "_net", None) is not None:
+            self._net.stop()  # the PSP loses its internet; the saved choice stays for next time
         self.psp.stop()
         super().closeEvent(e)
         if e.isAccepted() and self._restart_after:
@@ -2169,6 +2262,141 @@ class MainWindow(QMainWindow):
                 == QMessageBox.StandardButton.Yes:
             self._restart_after = update.appimage() or os.environ.get("APPIMAGE", "")
             self.close()
+
+    # ------------------------------------------------- XLT over USB sync --
+    def update_xlt(self):
+        """Menu: Update XLT on the PSP (xltupdate.py). GitHub's latest XLT and the PSP's
+        version are looked up, then the user picks what to send."""
+        if not self.psp.ready():
+            QMessageBox.information(self, "Update XLT", "Connect the PSP first: XLT running with "
+                                    "USB sync on (Settings > XLT > USB sync), and the cable.")
+            return
+
+        def run():
+            try:
+                self.xlt_signals.checked.emit(xltupdate.latest(), "")
+            except Exception as e:  # noqa: BLE001 - offline: a file can still be sent
+                self.xlt_signals.checked.emit(None, str(e))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _xlt_checked(self, rel, err: str):
+        self._xlt_rel, self._xlt_err = rel, err
+        self.psp.run_task(Task("xlt-find", lambda link, _t: xltupdate.find_xlt(link)))
+
+    def _xlt_set_progress(self, f: float):
+        if self._xlt_progress:
+            self._xlt_progress.setValue(int(f * 1000))
+
+    def _xlt_progress_open(self, text: str):
+        self._xlt_progress = QProgressDialog(text, "Stop", 0, 1000, self)
+        self._xlt_progress.setWindowTitle("Update XLT")
+        self._xlt_progress.setMinimumDuration(0)
+        self._xlt_cancel = threading.Event()
+        self._xlt_progress.canceled.connect(self._xlt_cancel.set)
+
+    def _xlt_progress_close(self):
+        if self._xlt_progress:
+            self._xlt_progress.close()
+            self._xlt_progress = None
+
+    def _xlt_task_done(self, task):
+        if task.name == "xlt-find":
+            if task.error:
+                QMessageBox.warning(self, "Update XLT", task.error)
+            elif not task.result:
+                QMessageBox.warning(self, "Update XLT", "XLT's folder (PSP/GAME/XLT) isn't on the PSP.")
+            else:
+                self._xlt_choose(task.result)
+        elif task.name == "xlt-send":
+            self._xlt_progress_close()
+            version = task.data
+            if task.error == "cancelled":
+                return
+            if task.error:
+                QMessageBox.warning(self, "Update XLT", f"XLT {version} wasn't sent: {task.error}")
+                return
+            QMessageBox.information(self, "Update XLT", f"XLT {version} is on the PSP.\n\n"
+                                    "Install it there: XLT shows it now (or in Settings > About). "
+                                    "The XLT it replaces is kept on the stick.")
+
+    def _xlt_choose(self, psp: "xltupdate.PspXlt"):
+        self._xlt_psp = psp
+        rel = self._xlt_rel
+        have = psp.running or "an older XLT"
+        box = QMessageBox(self)
+        box.setWindowTitle("Update XLT")
+        box.setIcon(QMessageBox.Icon.Information)
+        if psp.next:
+            box.setText(f"The PSP runs XLT {have}; XLT {psp.next} is installed and runs from XLT's next start.")
+        else:
+            box.setText(f"The PSP runs XLT {have}.")
+        if not psp.running:
+            box.setText(box.text() + "\nThat XLT can't install updates over USB: update it once over "
+                        "Wi-Fi or by copying, then this works.")
+        go = None
+        if rel:
+            newer = not psp.running or update.version_cmp(rel.version, psp.running) > 0
+            box.setInformativeText(f"XLT {rel.version} is the latest release" +
+                                   ("." if newer else ": the PSP has it already."))
+            box.setDetailedText(update.plain_notes(rel.notes) or "")
+            if psp.running:
+                go = box.addButton(f"Send XLT {rel.version}", QMessageBox.ButtonRole.AcceptRole)
+        else:
+            box.setInformativeText(f"Couldn't ask GitHub: {self._xlt_err}" if self._xlt_err
+                                   else "GitHub has no XLT release this computer can see.")
+        pick = box.addButton("Send a file…", QMessageBox.ButtonRole.ActionRole) if psp.running else None
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        if go:
+            box.setDefaultButton(go)
+        box.exec()
+        clicked = box.clickedButton()
+        if go is not None and clicked is go:
+            self._xlt_progress_open(f"Downloading XLT {rel.version}…")
+
+            def run():
+                try:
+                    data = xltupdate.download(rel, self.xlt_signals.progress.emit, self._xlt_cancel.is_set)
+                    self.xlt_signals.fetched.emit(data, rel.version, "")
+                except InterruptedError:
+                    self.xlt_signals.fetched.emit(None, rel.version, "cancelled")
+                except Exception as e:  # noqa: BLE001 - reported
+                    self.xlt_signals.fetched.emit(None, rel.version, str(e))
+            threading.Thread(target=run, daemon=True).start()
+        elif pick is not None and clicked is pick:
+            start = str(self.settings.value("xlt_update_dir", "") or os.path.expanduser("~"))
+            path, _ = QFileDialog.getOpenFileName(self, "XLT to send", start,
+                                                  "XLT (EBOOT.PBP *.pbp *.PBP *.zip);;All files (*)")
+            if not path:
+                return
+            self.settings.setValue("xlt_update_dir", os.path.dirname(path))
+            try:
+                data, version = xltupdate.read_eboot(path)
+            except (OSError, ValueError) as e:
+                QMessageBox.warning(self, "Update XLT", f"{os.path.basename(path)}: {e}")
+                return
+            if update.version_cmp(version, psp.running) < 0 and QMessageBox.question(
+                    self, "Update XLT", f"{os.path.basename(path)} is XLT {version}, older than the PSP's "
+                    f"{psp.running}. Send it anyway?") != QMessageBox.StandardButton.Yes:
+                return
+            self._xlt_send(data, version, f"From {os.path.basename(path)} on the computer.")
+
+    def _xlt_fetched(self, data, version: str, err: str):
+        if err:
+            self._xlt_progress_close()
+            if err != "cancelled":
+                QMessageBox.warning(self, "Update XLT", f"Couldn't get XLT {version}: {err}")
+            return
+        rel = self._xlt_rel
+        self._xlt_send(data, version, rel.notes if rel else "")
+
+    def _xlt_send(self, data: bytes, version: str, notes: str):
+        psp = self._xlt_psp
+        self._xlt_progress_close()
+        self._xlt_progress_open(f"Sending XLT {version} to the PSP…")
+        task = Task("xlt-send", lambda link, t: xltupdate.send(link, psp, data, version, notes, t.report, t.cancelled), version)
+        self._xlt_progress.canceled.connect(task.cancel.set)
+        self.psp.run_task(task)
+
 
     def about(self):
         from PySide6.QtCore import QByteArray

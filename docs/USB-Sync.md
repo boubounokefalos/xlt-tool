@@ -37,6 +37,16 @@ USB sync never hands the stick over. XLT shows up as a device of its own (054c:0
 - it runs the Library's tasks (scan, copy, send, remove, saves) one at a time, each one stoppable. A task stopped
   mid-transfer drops the link and starts over after the PSP's 3 s timeout.
 
+## Files tab
+
+The **Files** tab (`xlttool/filesview.py`, the work in `xlttool/pspfiles.py`) browses the folders sync may change:
+Video, Music, Pictures, Books, Downloads, ISO, PSP/GAME and the saves (both storages on a PSP Go). From there:
+send files or folders (buttons, or drop them on the list; names are made Shift-JIS-safe), copy to this PC, open
+a file (copied to `~/.cache/xlt-tool/open` and opened with the PC's app), rename (F2), new folder, delete
+(Delete; folders with everything in them). Its work runs as tasks on the same worker, one at a time, stoppable.
+The PSP's rules are shown before it would refuse: in the saves only save folders, and only files inside them;
+XLT's own folder is never deleted or renamed. A save deleted here is backed up first, as the Library does.
+
 The protocol versions XLT Tool uses: 2 (free space from the FAT, folder delete, writable save folders),
 3 (READ, a piece of a file), 4 (POWER, the battery). An older XLT works for sending files; the Library's PSP side
 needs protocol 3.

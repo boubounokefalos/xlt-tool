@@ -11,7 +11,7 @@ On the PSP: XLT > Settings > XLT > USB sync (On), then connect the cable.
     xltlink.py rm [-r] PATH...            delete files or empty folders (-r: folders with what is in them)
     xltlink.py mv FROM TO                 rename (in the same folder; the PSP may refuse others)
     xltlink.py mkdir PATH                 make a folder, with its parents
-    xltlink.py df [--fresh] [ms0:|ef0:]   free space (counted from the FAT, ~1 s; then kept for a minute)
+    xltlink.py df [--fresh] [ms0:|ef0:]   free space (the PSP's own count, ~12 s the first time; then kept for a minute)
     xltlink.py selftest [DIR]             try every command on test files in DIR (default ms0:/DOWNLOADS/xltlink-test)
     xltlink.py speed [--mb N]             raw link speed, nothing written
     xltlink.py ctl                        the Windows (WinUSB) descriptors, as Windows would ask
@@ -46,6 +46,7 @@ PYUSB_MISSING = ("pyusb is missing: install python-pyusb (Arch), python3-usb (De
 VID, PID = 0x054C, 0x01CB
 SUBCLASS, PROTOCOL = 0x58, 0x53
 CAST_PROTOCOL = 0x43  # XLT Cast (plugin/xltcast): the same IDs and subclass, while a game is cast
+NET_PROTOCOL = 0x4E   # the PSP's wired internet (plugin/xltnet): the same IDs and subclass too
 VENDOR_REQ = 0x58
 GUID = "{AE1513B4-0AA3-4365-B951-3261C67CE994}"
 MAGIC = 0x53544C58
@@ -75,7 +76,7 @@ POWER_S = struct.Struct("<iiii")    # battery %, charging, plugged in, minutes l
 
 TIMEOUT = 5000          # ms, a command and its reply
 DATA_TIMEOUT = 30000    # ms, one transfer of a file (the stick can pause to allocate)
-DF_TIMEOUT = 90000      # ms, counting free clusters on a big card (the driver's way, if the FAT can't be read)
+DF_TIMEOUT = 90000      # ms, the PSP driver counting free clusters on a big card (~12 s on 128 GB)
 TREE_TIMEOUT = 600000   # ms, deleting a folder with thousands of files
 
 MODELS = {0: "PSP-1000", 1: "PSP-2000", 2: "PSP-3000", 3: "PSP-3000", 4: "PSP Go", 6: "PSP-3000",
@@ -113,7 +114,7 @@ def psp_path(p: str) -> str:
 # can't be opened. Such characters are replaced by the nearest plain one.
 _SUBST = {"ß": "ss", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "ø": "o", "Ø": "O", "đ": "d", "Đ": "D",
           "ł": "l", "Ł": "L", "þ": "th", "Þ": "Th", "ð": "d", "ı": "i", "…": "...", "€": "EUR", "™": "TM",
-          "©": "(c)", "®": "(R)"}
+          "©": "(c)", "®": "(R)", "ς": "σ"}  # Shift-JIS has no final sigma
 _DASHES, _QUOTES = "‐‑‒–—―−", "‘’‚‛′“”„‟″«»‹›"
 _FAT_BAD = '\\:*?"<>|'
 
@@ -152,6 +153,72 @@ def psp_name(name: str) -> str:
             out.append(plain or "_")
     result = "".join(out).rstrip(" .")  # FAT drops trailing dots and spaces
     return result or "_"
+
+
+# The fallback when the PSP refuses a name anyway (80010016, EINVAL): seen once on an
+# E1004 on 2026-11-24, every two-byte Shift-JIS name refused while ASCII ones worked,
+# and not seen again since. Link then makes the name plain ASCII and tries once more:
+# Greek and Cyrillic in Latin letters, accents dropped, the rest "_".
+EINVAL = 0x80010016
+_LATIN = dict(zip("αβγδεζηθικλμνξοπρσςτυφχψω",
+                  "a v g d e z i th i k l m n x o p r s s t y f ch ps o".split()))
+_LATIN.update(zip("абвгдеёжзийклмнопрстуфхцчшщъыьэюяіїєґђјљњћџ",
+                  "a b v g d e e zh z i y k l m n o p r s t u f kh ts ch sh shch _ y _ e yu ya "
+                  "i yi ye g dj j lj nj c dz".split()))
+_LATIN = {k: ("" if v == "_" else v) for k, v in _LATIN.items()}
+_PAIRS = {"ου": "ou", "αυ": "av", "ευ": "ev", "μπ": "b", "ντ": "nt"}  # Greek pairs read as one sound
+_ASCII_SUBST = {"×": "x", "÷": "-", "°": "o", "·": "-", "¡": "!", "¿": "?"}
+
+
+def _plain(ch: str) -> str:
+    """One character as plain ASCII ("" if it has none)."""
+    import unicodedata
+    for table in (_SUBST, _ASCII_SUBST):
+        if ch in table and table[ch].isascii():
+            return table[ch]
+    if ch in _DASHES:
+        return "-"
+    if ch in _QUOTES:
+        return "'"
+    out = ""
+    for c in unicodedata.normalize("NFKD", ch):  # the letter without its accent (é -> e, ά -> α)
+        if unicodedata.combining(c):
+            continue
+        if " " <= c <= "~":
+            out += c
+        elif c.lower() in _LATIN:
+            lat = _LATIN[c.lower()]
+            out += lat if c == c.lower() else lat[:1].upper() + lat[1:]
+    return out
+
+
+def ascii_name(name: str) -> str:
+    """A name in plain ASCII, for when the PSP refuses its Shift-JIS form (see EINVAL)."""
+    import unicodedata
+    name = unicodedata.normalize("NFC", name)
+    out, i = [], 0
+    while i < len(name):
+        ch = name[i]
+        if ch in _FAT_BAD or ord(ch) < 0x20 or ord(ch) == 0x7F:
+            out.append("_")
+            i += 1
+            continue
+        if " " <= ch <= "~":
+            out.append(ch)
+            i += 1
+            continue
+        pair = "".join(c for c in unicodedata.normalize("NFKD", name[i:i + 2]) if not unicodedata.combining(c))
+        if len(pair) == 2 and pair.lower() in _PAIRS:
+            lat = _PAIRS[pair.lower()]
+            out.append(lat.upper() if pair.isupper() else lat.capitalize() if pair[0].isupper() else lat)
+            i += 2
+            continue
+        lat = _plain(ch)
+        if len(lat) > 1 and ch.isupper() and name[i + 1:i + 2].isupper():  # ΧΡΗΣΤΟΣ -> CHRISTOS
+            lat = lat.upper()
+        out.append(lat or "_")
+        i += 1
+    return "".join(out).rstrip(" .") or "_"
 
 
 def psp_bytes(path: str) -> bytes:
@@ -194,11 +261,20 @@ def parse_entries(data: bytes) -> list[Entry]:
     return out
 
 
+def other_mode(protocol: int) -> str:
+    if protocol == CAST_PROTOCOL:
+        return "No XLT sync device: the PSP is casting a game (XLT Cast)"
+    if protocol == NET_PROTOCOL:
+        return "No XLT sync device: the PSP is on its wired internet link"
+    return f"No XLT sync device: the PSP is in another mode (protocol {protocol:#x})"
+
+
 class Link:
     """One XLT sync device. Every method raises XltsError when the PSP says no,
     usb.core.USBError when the link itself fails."""
 
     def __init__(self, backend=None):
+        self.renamed = {}  # path asked for (lower case) -> the ASCII path made instead (see EINVAL)
         if usb is None:
             raise LinkError(PYUSB_MISSING)
         dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
@@ -222,12 +298,14 @@ class Link:
 
     def _setup(self, dev):
         try:  # from the descriptor the system keeps: no need to open the device
-            casting = any(i.bInterfaceSubClass == SUBCLASS and i.bInterfaceProtocol == CAST_PROTOCOL for i in dev[0])
+            other = [i.bInterfaceProtocol for i in dev[0]
+                     if i.bInterfaceSubClass == SUBCLASS and i.bInterfaceProtocol != PROTOCOL]
         except (usb.core.USBError, IndexError):
-            casting = False
-        if casting:
-            # Before opening: on Windows the Cast window holds it, and opening fails as if the driver were wrong
-            raise LinkError("No XLT sync device: the PSP is casting a game (XLT Cast)")
+            other = []
+        if other:
+            # Before opening: on Windows the Cast window (or the net link) holds it, and opening fails
+            # as if the driver were wrong
+            raise LinkError(other_mode(other[0]))
         try:
             # Only when not set up yet: setting the configuration again makes the PSP
             # start over (it cancels what it was waiting for, then attaches anew).
@@ -250,9 +328,9 @@ class Link:
         intf = usb.util.find_descriptor(cfg, bInterfaceClass=0xFF, bInterfaceSubClass=SUBCLASS)
         if intf is None:
             raise LinkError("The device has no XLT sync interface")
-        if intf.bInterfaceProtocol == CAST_PROTOCOL:
-            # the same IDs, but XLT Cast's device (a game is being cast): not ours to open
-            raise LinkError("No XLT sync device: the PSP is casting a game (XLT Cast)")
+        if intf.bInterfaceProtocol != PROTOCOL:
+            # the same IDs, but XLT Cast's or the net link's device: not ours to open
+            raise LinkError(other_mode(intf.bInterfaceProtocol))
         try:
             usb.util.claim_interface(dev, intf)
         except usb.core.USBError as e:
@@ -302,10 +380,35 @@ class Link:
             raise XltsError(status, rarg, what)
         return status, rarg, data
 
-    @staticmethod
-    def _path(p) -> bytes:
-        """str: made holdable (psp_bytes). bytes: sent exactly as given (tests of the PSP's own checks)."""
-        return p.rstrip(b"\0") + b"\0" if isinstance(p, bytes) else psp_bytes(p)
+    def _path(self, p) -> bytes:
+        """str: made holdable (psp_bytes), inside a folder made under an ASCII name if it was.
+        bytes: sent exactly as given (tests of the PSP's own checks)."""
+        return p.rstrip(b"\0") + b"\0" if isinstance(p, bytes) else psp_bytes(self.real(p))
+
+    def real(self, path: str) -> str:
+        """Where path is on the PSP: the same, unless it (or a folder it is in) had to be made
+        under an ASCII name in this session."""
+        p = psp_shown(path)  # names as the PSP holds them, as the keys are
+        low = p.lower()
+        for asked in sorted(getattr(self, "renamed", {}), key=len, reverse=True):
+            if low == asked or low.startswith(asked + "/"):
+                return self.renamed[asked] + p[len(asked):]
+        return p
+
+    def _ascii_retry(self, path, e: XltsError):
+        """The ASCII path to try instead when the PSP refused path's name (None: not that case)."""
+        if isinstance(path, bytes) or e.status != E_IO or (e.arg & 0xFFFFFFFF) != EINVAL:
+            return None
+        p = self.real(path)
+        folder, name = p.rsplit("/", 1)
+        if psp_name(name).isascii():
+            return None
+        return f"{folder}/{ascii_name(name)}"
+
+    def _made_as(self, path: str, alt: str):
+        if not hasattr(self, "renamed"):
+            self.renamed = {}
+        self.renamed[psp_shown(path).lower()] = alt
 
     # -- commands
     def hello(self) -> dict:
@@ -339,8 +442,18 @@ class Link:
             raise
         return parse_entries(data)[0]
 
-    def mkdir(self, path: str):
-        self._call(MKDIR, self._path(path), what=psp_path(path))
+    def mkdir(self, path: str) -> str:
+        """Returns the folder's path on the PSP (an ASCII name if the PSP refused the name)."""
+        try:
+            self._call(MKDIR, self._path(path), what=psp_path(path))
+            return path if isinstance(path, bytes) else self.real(path)
+        except XltsError as e:
+            alt = self._ascii_retry(path, e)
+            if alt is None:
+                raise
+        self._call(MKDIR, psp_bytes(alt), what=alt)
+        self._made_as(path, alt)
+        return alt
 
     def delete(self, path: str):
         self._call(DELETE, self._path(path), what=psp_path(path))
@@ -357,18 +470,38 @@ class Link:
             raise e
         return dict(files=files, folders=folders, bytes=size)
 
-    def rename(self, src: str, dst: str):
-        self._call(RENAME, self._path(src) + self._path(dst), what=f"{psp_path(src)} -> {psp_path(dst)}")
+    def rename(self, src: str, dst: str) -> str:
+        """Returns the new path on the PSP (an ASCII name if the PSP refused the name)."""
+        what = f"{psp_path(src)} -> {psp_path(dst)}"
+        try:
+            self._call(RENAME, self._path(src) + self._path(dst), what=what)
+            return dst if isinstance(dst, bytes) else self.real(dst)
+        except XltsError as e:
+            alt = self._ascii_retry(dst, e)
+            if alt is None:
+                raise
+        self._call(RENAME, self._path(src) + psp_bytes(alt), what=what)
+        self._made_as(dst, alt)
+        return alt
 
     def put(self, local: str, remote: str, replace: bool = False, progress=None) -> dict:
         """Sends one file. progress(sent, total) is called as it goes. Returns
-        {bytes, seconds (PC), psp_seconds (writing on the PSP)}."""
+        {bytes, seconds (PC), psp_seconds (writing on the PSP), name (the path as on the PSP:
+        an ASCII name if the PSP refused the name)}."""
         size = os.path.getsize(local)
         if size >= 1 << 32:
             raise XltsError(E_SIZE, 0, f"{local}: 4 GB or more (FAT32 can't hold it)")
         req = PUT_S.pack(size, PUT_REPLACE if replace else 0, 0, 0, 0, 0, 0, 0)
-        req = req[:8] + psp_time(os.path.getmtime(local)) + self._path(remote)
-        _, chunk, _ = self._call(PUT, req, what=psp_shown(remote))
+        req = req[:8] + psp_time(os.path.getmtime(local))
+        try:
+            _, chunk, _ = self._call(PUT, req + self._path(remote), what=psp_shown(self._path(remote)))
+        except XltsError as e:
+            alt = self._ascii_retry(remote, e)
+            if alt is None:
+                raise
+            _, chunk, _ = self._call(PUT, req + psp_bytes(alt), what=alt)
+            self._made_as(remote, alt)
+        shown = psp_shown(self._path(remote))
         crc, sent, t0 = 0, 0, time.perf_counter()
         with open(local, "rb") as f:
             while sent < size:
@@ -382,14 +515,14 @@ class Link:
                     progress(sent, size)
         status, err, data = self._reply(PUT, DATA_TIMEOUT)
         if status:
-            raise XltsError(status, err, psp_shown(remote))
+            raise XltsError(status, err, shown)
         psp_crc, us, written = PUTDONE_S.unpack(data)
         keep = psp_crc == crc and written == size
-        self._call(PUT_END, arg=1 if keep else 0, what=psp_path(remote))
+        self._call(PUT_END, arg=1 if keep else 0, what=shown)
         if not keep:
-            raise RuntimeError(f"{psp_shown(remote)}: the PSP wrote something else "
+            raise RuntimeError(f"{shown}: the PSP wrote something else "
                                f"(CRC {psp_crc:08x}, expected {crc:08x}): not kept")
-        return dict(bytes=size, seconds=time.perf_counter() - t0, psp_seconds=us / 1e6, name=psp_shown(remote))
+        return dict(bytes=size, seconds=time.perf_counter() - t0, psp_seconds=us / 1e6, name=shown)
 
     def get(self, remote, local: str | None = None, progress=None) -> bytes:
         """A file from the PSP: its bytes, or, with local, written there as it comes
@@ -619,7 +752,7 @@ def cmd_mkdir(link: Link, a):
 def cmd_df(link: Link, a):
     t0 = time.perf_counter()
     free, total = link.df(a.dev or "ms0:", a.fresh)
-    how = {DF_COUNTED: "counted from the FAT", DF_KEPT: "kept from the last count",
+    how = {DF_COUNTED: "counted from the FAT (older XLT)", DF_KEPT: "kept from the last count",
            DF_DRIVER: "the PSP's own count"}.get(link.df_how, "?")
     print(f"{a.dev or 'ms0:'} {human(free)} free of {human(total)} ({how}, {time.perf_counter() - t0:.1f} s)")
 

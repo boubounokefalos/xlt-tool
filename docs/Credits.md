@@ -63,6 +63,13 @@ licences of ffmpeg and atracdenc, XLT Tool's licence and this page are in the `l
 
 Neither is bundled: the lists and covers are downloaded on your PC when you turn box art on.
 
+## Downloaded when you use it
+
+- [USBNet](https://github.com/chriopter/pspkit-usbnet) by chriopter (MIT): the PSP's internet over the USB cable
+  (the **Internet** button). XLT Tool downloads its latest release from GitHub (the PSP plugin and
+  `pspkit-usbnetd` for this computer, checked against GitHub's SHA-256) the first time you press Internet and
+  whenever a newer one comes out, keeps it in its data folder, and runs its gateway. It isn't bundled.
+
 ## Not included
 
 XLT Tool contains no Sony software. A PS1 EBOOT needs Sony's DATA.PSP, STARTDAT and (for several discs) the

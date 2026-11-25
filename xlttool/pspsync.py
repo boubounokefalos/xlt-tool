@@ -87,6 +87,7 @@ class PspSync(QObject):
         self._current: Upload | None = None
         self.status, self.text = "none", ""
         self.model = ""
+        self.devices: list[str] = []   # the PSP's storage ("ms0:", "ef0:" on a PSP Go)
         self.power_info: dict | None = None
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="psp-sync", daemon=True)
@@ -184,6 +185,7 @@ class PspSync(QObject):
                     link = xltlink.Link(backend)
                     h = link.info
                     self.model = xltlink.MODELS.get(h["model"], "PSP")
+                    self.devices = [d for bit, d in ((1, "ms0:"), (2, "ef0:")) if h["devices"] & bit] or ["ms0:"]
                     self._power(link)
                     last_power = time.monotonic()
                     self._set("ready", self.model)
@@ -288,8 +290,8 @@ class PspSync(QObject):
                 if up.cancel.is_set():
                     raise InterruptedError
                 self.progress.emit(up.job, sent / total)
-            link.put(up.main, target, progress=step1)
-            return [xltlink.psp_shown(target)]
+            got = link.put(up.main, target, progress=step1)
+            return [(got or {}).get("name") or xltlink.psp_shown(target)]
 
         # one free name for the file and its companions: "Name", "Name 2", ...
         plan: list[tuple[str, str]] = []
@@ -320,7 +322,7 @@ class PspSync(QObject):
                     raise InterruptedError
                 self.progress.emit(up.job, (base + sent) / total)
 
-            link.put(local, remote, progress=step)
+            got = link.put(local, remote, progress=step)
             done += os.path.getsize(local)
-            written.append(xltlink.psp_shown(remote))
+            written.append((got or {}).get("name") or xltlink.psp_shown(remote))
         return written
